@@ -1,0 +1,47 @@
+# ── Banco de dados ────────────────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# ── Python ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── Ambientes virtuais ────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# ── Variáveis de ambiente / segredos ─────────────────────────────
+.env
+.env.*
+*.env
+
+# ── VS Code ───────────────────────────────────────────────────────
+.vscode/
+
+# ── OS ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ─────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Uploads temporários ───────────────────────────────────────────
+uploads/
+tmp/
+temp/
