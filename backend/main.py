@@ -319,8 +319,64 @@ async def upload_excel(
             db.query(MetaFaturamento).delete()
             db.commit()
             _progress(35, "Normalizando colunas de Meta de Faturamento...")
-            numeric = ['cod_grupo', 'valor']
-            result = _process_df(df, META_COLUMN_MAP, MetaFaturamento, numeric, db)
+
+            # ── Detecta formato wide (pivot) vs long ──────────────────────────
+            # Wide: agrupadores como colunas (ex: "DIRETAS ÁGUA", "DIRETAS ESGOTO"…)
+            # Long: colunas CIDADE, AGRUPADOR, VALOR em linhas separadas
+            _df_norm_cols = [normalize_col(c) for c in df.columns]
+            _has_long = any(c in META_COLUMN_MAP for c in _df_norm_cols)
+
+            if not _has_long:
+                # ── Formato wide → melt ───────────────────────────────────────
+                _EXCL_NORM = {
+                    'TOTAL_GERAL', 'GRANDTOTAL', 'GRAND_TOTAL', 'TOTAL',
+                    'TOTALGERAL', 'TOTAL_GENERAL',
+                }
+                _orig_cols   = list(df.columns)
+                _city_col    = _orig_cols[0]          # primeira coluna = cidade
+                _agrup_cols  = [
+                    c for n, c in zip(_df_norm_cols, _orig_cols)
+                    if n not in _EXCL_NORM and c != _city_col
+                ]
+
+                _df_wide = df[[_city_col] + _agrup_cols].copy()
+                _df_wide.rename(columns={_city_col: 'cidade'}, inplace=True)
+
+                # Remove linha de Total Geral e células vazias
+                _df_wide = _df_wide[
+                    _df_wide['cidade'].notna() &
+                    (~_df_wide['cidade'].astype(str).str.strip().str.upper().isin(
+                        ['TOTAL GERAL', 'TOTAL', 'GRAND TOTAL', '']
+                    ))
+                ]
+
+                _df_long = _df_wide.melt(
+                    id_vars=['cidade'],
+                    value_vars=_agrup_cols,
+                    var_name='agrupador',
+                    value_name='valor',
+                )
+                _df_long['valor']    = pd.to_numeric(_df_long['valor'], errors='coerce')
+                _df_long['cidade']   = _df_long['cidade'].astype(str).str.strip()
+                _df_long['agrupador'] = _df_long['agrupador'].astype(str).str.strip()
+                # Remove linhas sem valor ou com valor zero
+                _df_long = _df_long[_df_long['valor'].notna() & (_df_long['valor'] != 0)]
+
+                _records = _df_long[['cidade', 'agrupador', 'valor']].to_dict(orient='records')
+                _BATCH = 10_000
+                for _i in range(0, len(_records), _BATCH):
+                    db.bulk_insert_mappings(MetaFaturamento, _records[_i:_i + _BATCH])
+                db.commit()
+                result = {
+                    "total": len(_records),
+                    "colunas_mapeadas": ['cidade', 'agrupador', 'valor'],
+                    "colunas_nao_mapeadas": [],
+                }
+            else:
+                # ── Formato long (padrão) ─────────────────────────────────────
+                numeric = ['cod_grupo', 'valor']
+                result = _process_df(df, META_COLUMN_MAP, MetaFaturamento, numeric, db)
+
             label = "Meta de Faturamento"
         else:
             db.query(Faturamento).delete()
@@ -870,6 +926,13 @@ def get_metas(
             "by_agrupador": [],
         }
 
+    # Apenas estes agrupadores compõem a meta total
+    _IN = "('DIRETAS \u00c1GUA','DIRETAS AGUA'," \
+          "'DIRETAS ESGOTO'," \
+          "'INDIRETAS \u00c1GUA','INDIRETAS AGUA'," \
+          "'INDIRETAS ESGOTO'," \
+          "'SERVI\u00c7O B\u00c1SICO','SERVICO BASICO')"
+
     params: dict = {
         "cidade":    cidade,
         "macro":     macro,
@@ -877,15 +940,6 @@ def get_metas(
         "agrupador": agrupador,
         "top_n":     top_n,
     }
-
-    # Agrupadores excluídos dos cálculos de meta (serviços fora do escopo)
-    _EX = (
-        "('CON. FAT. ESGOTO','ECO. FAT. SB',"
-        "'ECO FAT AGUA','ECO FAT ESGOTO','CON FAT AGUA',"
-        "'ECO. FAT. ESGOTO',"
-        "'ECO. FAT. \u00c1GUA','ECO. FAT. AGUA',"
-        "'CON. FAT. \u00c1GUA','CON. FAT. AGUA')"
-    )
 
     # ── Meta agregada por cidade (respeitando filtros) ─────────────────────────
     meta_sql = text(f"""
@@ -900,11 +954,27 @@ def get_metas(
           AND (:macro     IS NULL OR macro     = :macro)
           AND (:micro     IS NULL OR micro     = :micro)
           AND (:agrupador IS NULL OR agrupador = :agrupador)
-          AND UPPER(TRIM(agrupador)) NOT IN {_EX}
+          AND UPPER(TRIM(agrupador)) IN {_IN}
         GROUP BY UPPER(TRIM(cidade))
         ORDER BY meta DESC
         LIMIT :top_n
     """)
+
+    # ── Meta TOTAL (sem LIMIT) e número de municípios ──────────────────────────
+    total_meta_sql = text(f"""
+        SELECT 
+            SUM(valor) AS total_meta,
+            COUNT(DISTINCT UPPER(TRIM(cidade))) AS cidades_meta
+        FROM meta_faturamento
+        WHERE (:cidade    IS NULL OR cidade    = :cidade)
+          AND (:macro     IS NULL OR macro     = :macro)
+          AND (:micro     IS NULL OR micro     = :micro)
+          AND (:agrupador IS NULL OR agrupador = :agrupador)
+          AND UPPER(TRIM(agrupador)) IN {_IN}
+    """)
+    total_result = db.execute(total_meta_sql, params).one()
+    total_meta = float(total_result.total_meta or 0)
+    total_cidades_meta = total_result.cidades_meta or 0
 
     # ── Faturamento realizado agregado por cidade (sem filtro de tipo) ─────────
     fat_sql = text("""
@@ -916,10 +986,29 @@ def get_metas(
         WHERE (is_grand_total IS NULL OR is_grand_total = 0)
         GROUP BY UPPER(TRIM(cidade))
     """)
-
-    meta_rows = db.execute(meta_sql, params).fetchall()
     fat_dict  = {r.cidade_key: r for r in db.execute(fat_sql).fetchall()}
 
+    # ── Lista de todas as cidades com meta (sem LIMIT) para cálculo do realizado total
+    cidades_meta_keys_sql = text(f"""
+        SELECT DISTINCT UPPER(TRIM(cidade)) AS cidade_key
+        FROM meta_faturamento
+        WHERE (:cidade    IS NULL OR cidade    = :cidade)
+          AND (:macro     IS NULL OR macro     = :macro)
+          AND (:micro     IS NULL OR micro     = :micro)
+          AND (:agrupador IS NULL OR agrupador = :agrupador)
+          AND UPPER(TRIM(agrupador)) IN {_IN}
+    """)
+    cidades_meta_keys = [row[0] for row in db.execute(cidades_meta_keys_sql, params).fetchall()]
+
+    # Realizado total sobre as cidades que têm meta (respeitando filtros)
+    realizado_total = 0.0
+    for key in cidades_meta_keys:
+        f = fat_dict.get(key)
+        if f:
+            realizado_total += float(f.realizado or 0)
+
+    # ── Construir lista de cidades para exibição (limitada a top_n) ───────────
+    meta_rows = db.execute(meta_sql, params).fetchall()
     by_cidade = []
     for m in meta_rows:
         f         = fat_dict.get(m.cidade_key)
@@ -950,7 +1039,7 @@ def get_metas(
         WHERE (:cidade    IS NULL OR cidade    = :cidade)
           AND (:macro     IS NULL OR macro     = :macro)
           AND (:micro     IS NULL OR micro     = :micro)
-          AND UPPER(TRIM(agrupador)) NOT IN {_EX}
+          AND UPPER(TRIM(agrupador)) IN {_IN}
         GROUP BY agrupador
         ORDER BY meta DESC
     """)
@@ -962,20 +1051,18 @@ def get_metas(
         for r in ag_rows
     ]
 
-    # ── KPIs globais ──────────────────────────────────────────────────────────
-    meta_total    = sum(r["meta"]      for r in by_cidade)
-    realizado_tot = sum(r["realizado"] for r in by_cidade)
-    gap_total     = round(meta_total - realizado_tot, 2)
-    pct_global    = round(realizado_tot / meta_total * 100, 2) if meta_total > 0 else 0.0
+    # ── KPIs globais (sobre todos os dados, não apenas top_n) ──────────────────
+    gap_total     = round(total_meta - realizado_total, 2)
+    pct_global    = round(realizado_total / total_meta * 100, 2) if total_meta > 0 else 0.0
     cidades_acima = sum(1 for r in by_cidade if r["pct_atingimento"] >= 100)
 
     return {
         "kpis": {
-            "meta_total":       round(meta_total, 2),
-            "realizado":        round(realizado_tot, 2),
+            "meta_total":       round(total_meta, 2),
+            "realizado":        round(realizado_total, 2),
             "pct_atingimento":  pct_global,
             "gap":              gap_total,
-            "cidades_meta":     len(by_cidade),
+            "cidades_meta":     total_cidades_meta,
             "cidades_acima":    cidades_acima,
         },
         "by_cidade":    by_cidade,
