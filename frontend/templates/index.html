@@ -3,333 +3,361 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Faturamento Platform — Mapa de Ligações</title>
+    <title>Faturamento Platform — Dashboard Analítico</title>
 
-    <!-- Leaflet CSS (local) -->
     <link rel="stylesheet" href="/static/leaflet.css" />
-    <!-- Leaflet MarkerCluster CSS (local) -->
     <link rel="stylesheet" href="/static/MarkerCluster.css" />
     <link rel="stylesheet" href="/static/MarkerCluster.Default.css" />
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
+        :root {
+            --bg:      #0f172a;
+            --surface: #1e293b;
+            --surface2:#253347;
+            --border:  #334155;
+            --text:    #e2e8f0;
+            --muted:   #64748b;
+            --accent:  #10b981;
+            --accent2: #06b6d4;
+            --danger:  #ef4444;
+            --warn:    #f59e0b;
+            --violet:  #8b5cf6;
+        }
         body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
+            background: var(--bg);
+            color: var(--text);
             height: 100vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
-        /* ── TOPBAR ─────────────────────────────── */
+        /* ── TOPBAR ─────────────────────────────────────────────── */
         .topbar {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            border-bottom: 1px solid #334155;
-            padding: 0 20px;
-            height: 58px;
+            background: linear-gradient(135deg, var(--surface) 0%, #131e30 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 0 18px;
+            height: 52px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             flex-shrink: 0;
             z-index: 1000;
+            gap: 14px;
         }
-        .topbar-brand {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .topbar-brand .logo-icon {
-            width: 34px; height: 34px;
-            background: linear-gradient(135deg, #10b981, #059669);
+        .topbar-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .logo-icon {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, var(--accent), #059669);
             border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 18px;
+            font-size: 16px; flex-shrink: 0;
         }
-        .topbar-brand h1 { font-size: 17px; font-weight: 600; color: #f1f5f9; }
-        .topbar-brand span { font-size: 12px; color: #64748b; }
-        .topbar-actions { display: flex; align-items: center; gap: 12px; }
+        .brand-text h1 { font-size: 15px; font-weight: 700; color: #f1f5f9; line-height: 1.2; }
+        .brand-text span { font-size: 10px; color: var(--muted); }
 
-        .btn {
-            display: inline-flex; align-items: center; gap: 6px;
-            padding: 7px 14px; border-radius: 8px; font-size: 13px;
-            font-weight: 500; cursor: pointer; border: none;
-            transition: all .2s; font-family: inherit;
-        }
-        .btn-primary { background: #10b981; color: #fff; }
-        .btn-primary:hover { background: #059669; }
-        .btn-success { background: #10b981; color: #fff; }
-        .btn-success:hover { background: #059669; }
-        .btn-outline {
-            background: transparent; color: #94a3b8;
-            border: 1px solid #334155;
-        }
-        .btn-outline:hover { background: #1e293b; color: #e2e8f0; }
-        .btn-warning { background: #f59e0b; color: #fff; }
-        .btn-warning:hover { background: #d97706; }
-        .btn-sm { padding: 5px 10px; font-size: 12px; }
-
-        /* ── MAIN LAYOUT ─────────────────────────── */
-        .main {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        /* ── SIDEBAR ─────────────────────────────── */
-        .sidebar {
-            width: 300px;
-            background: #1e293b;
-            border-right: 1px solid #334155;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            flex-shrink: 0;
-            transition: width .3s;
-        }
-        .sidebar.collapsed { width: 0; overflow: hidden; }
-
-        .sidebar-section {
-            padding: 14px 16px;
-            border-bottom: 1px solid #2d3f55;
-        }
-        .sidebar-section h3 {
-            font-size: 11px; font-weight: 600;
-            text-transform: uppercase; letter-spacing: .8px;
-            color: #64748b; margin-bottom: 10px;
-        }
-
-        /* Upload area */
-        .upload-area {
-            border: 2px dashed #334155;
-            border-radius: 10px;
-            padding: 18px 12px;
-            text-align: center;
-            cursor: pointer;
-            transition: all .2s;
-            position: relative;
-        }
-        .upload-area:hover, .upload-area.drag-over {
-            border-color: #10b981;
-            background: rgba(16,185,129,.06);
-        }
-        .upload-area input[type=file] {
-            position: absolute; inset: 0; opacity: 0; cursor: pointer;
-        }
-        .upload-area .upload-icon { font-size: 28px; margin-bottom: 6px; }
-        .upload-area p { font-size: 12px; color: #94a3b8; line-height: 1.5; }
-        .upload-area strong { color: #e2e8f0; }
-
-        /* Progress */
-        .progress-bar-wrap {
-            background: #0f172a; border-radius: 4px; height: 6px;
-            margin-top: 8px; overflow: hidden; display: none;
-        }
-        .progress-bar {
-            height: 100%; background: linear-gradient(90deg, #10b981, #06b6d4);
-            width: 0%; transition: width .3s; border-radius: 4px;
-        }
-
-        /* Stats pills */
-        .stats-grid {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-        .stat-pill {
-            background: #0f172a;
+        .tab-nav {
+            display: flex; gap: 3px;
+            background: rgba(255,255,255,.04);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 10px;
-            text-align: center;
+            padding: 3px;
         }
-        .stat-pill .val { font-size: 20px; font-weight: 700; color: #10b981; }
-        .stat-pill .lbl { font-size: 10px; color: #64748b; margin-top: 2px; }
-
-        /* Filter controls */
-        .filter-group { margin-bottom: 10px; }
-        .filter-group label {
-            display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px;
-        }
-        .filter-group select, .filter-group input {
-            width: 100%; background: #0f172a; border: 1px solid #334155;
-            border-radius: 6px; color: #e2e8f0; padding: 6px 8px;
-            font-size: 12px; font-family: inherit; outline: none;
-            transition: border-color .2s;
-        }
-        .filter-group select:focus, .filter-group input:focus {
-            border-color: #10b981;
-        }
-        .filter-group option { background: #1e293b; }
-
-        /* Legend */
-        .legend-items { display: flex; flex-direction: column; gap: 6px; }
-        .legend-item {
-            display: flex; align-items: center; gap: 8px;
-            font-size: 12px; color: #cbd5e1;
-        }
-        .legend-dot {
-            width: 12px; height: 12px; border-radius: 50%;
-            flex-shrink: 0; border: 2px solid rgba(255,255,255,.2);
-        }
-
-        /* Toggle switches */
-        .toggle-row {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 10px;
-        }
-        .toggle-row label { font-size: 12px; color: #cbd5e1; }
-        .toggle {
-            position: relative; width: 38px; height: 20px;
-        }
-        .toggle input { opacity: 0; width: 0; height: 0; }
-        .toggle-slider {
-            position: absolute; inset: 0; background: #334155;
-            border-radius: 20px; cursor: pointer; transition: .3s;
-        }
-        .toggle-slider:before {
-            content: ""; position: absolute;
-            width: 14px; height: 14px; left: 3px; top: 3px;
-            background: white; border-radius: 50%; transition: .3s;
-        }
-        .toggle input:checked + .toggle-slider { background: #10b981; }
-        .toggle input:checked + .toggle-slider:before { transform: translateX(18px); }
-
-        /* Tipo breakdown table */
-        .tipo-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        .tipo-table th {
-            text-align: left; color: #64748b; font-weight: 500;
-            padding: 3px 4px; border-bottom: 1px solid #2d3f55;
-        }
-        .tipo-table td { padding: 4px 4px; color: #cbd5e1; }
-        .tipo-table tr:hover td { background: rgba(255,255,255,.03); }
-        .tipo-dot {
-            display: inline-block; width: 8px; height: 8px;
-            border-radius: 50%; margin-right: 4px;
-        }
-
-        .sidebar-scroll {
-            flex: 1; overflow-y: auto; scrollbar-width: thin;
-            scrollbar-color: #334155 transparent;
-        }
-
-        /* ── MAP AREA ─────────────────────────────── */
-        .map-wrap {
-            flex: 1;
-            position: relative;
-            overflow: hidden;
-        }
-        #map { width: 100%; height: 100%; }
-
-        /* Map overlay controls */
-        .map-controls {
-            position: absolute; top: 12px; right: 12px; z-index: 800;
-            display: flex; flex-direction: column; gap: 8px;
-        }
-        .map-control-btn {
-            background: #1e293b; border: 1px solid #334155;
-            color: #e2e8f0; padding: 8px 12px; border-radius: 8px;
-            font-size: 12px; font-weight: 500; cursor: pointer;
+        .tab-btn {
+            padding: 5px 16px;
+            border-radius: 6px;
+            font-size: 12px; font-weight: 600;
+            cursor: pointer; border: none;
+            background: transparent; color: var(--muted);
             font-family: inherit; transition: all .2s;
-            display: flex; align-items: center; gap: 6px;
             white-space: nowrap;
         }
-        .map-control-btn:hover { background: #2d3f55; }
-        .map-control-btn.active { background: #f59e0b; border-color: #f59e0b; color: #fff; }
-
-        /* Loading overlay */
-        .loading-overlay {
-            position: absolute; inset: 0; background: rgba(15,23,42,.85);
-            display: none; align-items: center; justify-content: center;
-            z-index: 900; flex-direction: column; gap: 12px;
+        .tab-btn.active {
+            background: var(--surface);
+            color: var(--text);
+            box-shadow: 0 1px 4px rgba(0,0,0,.4);
         }
+        .tab-btn:hover:not(.active) { color: var(--text); }
+
+        .topbar-right { display: flex; align-items: center; gap: 8px; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px; border-radius: 7px;
+            font-size: 12px; font-weight: 500;
+            cursor: pointer; border: none;
+            transition: all .2s; font-family: inherit;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: #059669; }
+        .btn-outline { background: transparent; color: #94a3b8; border: 1px solid var(--border); }
+        .btn-outline:hover { background: var(--surface); color: var(--text); }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+        /* ── LAYOUT ──────────────────────────────────────────────── */
+        .app-body { display: flex; flex: 1; overflow: hidden; }
+
+        /* ── SIDEBAR ─────────────────────────────────────────────── */
+        .sidebar {
+            width: 256px; flex-shrink: 0;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            transition: width .3s;
+        }
+        .sidebar.collapsed { width: 0; }
+        .sidebar-scroll {
+            flex: 1; overflow-y: auto;
+            scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+        }
+        .sidebar-section { padding: 12px 14px; border-bottom: 1px solid #253347; }
+        .sec-title {
+            font-size: 10px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: .8px;
+            color: var(--muted); margin-bottom: 10px;
+        }
+
+        /* Upload */
+        .upload-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+        .upload-tab-btn {
+            flex: 1; padding: 5px 4px; border-radius: 6px;
+            font-size: 10px; font-weight: 600;
+            cursor: pointer; border: 1px solid var(--border);
+            background: transparent; color: var(--muted);
+            font-family: inherit; transition: all .2s;
+        }
+        .upload-tab-btn.active-fat  { background: var(--accent);  color: #fff; border-color: var(--accent);  }
+        .upload-tab-btn.active-vol  { background: var(--accent2); color: #fff; border-color: var(--accent2); }
+        .upload-tab-btn.active-meta { background: var(--violet);  color: #fff; border-color: var(--violet);  }
+        .upload-area {
+            border: 2px dashed var(--border); border-radius: 8px;
+            padding: 14px 10px; text-align: center;
+            cursor: pointer; transition: all .2s; position: relative;
+        }
+        .upload-area:hover, .upload-area.drag-over {
+            border-color: var(--accent); background: rgba(16,185,129,.06);
+        }
+        .upload-area input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .upload-area .upload-icon { font-size: 22px; margin-bottom: 4px; }
+        .upload-area p { font-size: 11px; color: #94a3b8; line-height: 1.5; }
+        .progress-bar-wrap {
+            background: var(--bg); border-radius: 4px; height: 5px;
+            margin-top: 7px; overflow: hidden; display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            width: 0%; transition: width .25s; border-radius: 4px;
+        }
+        .upload-status { font-size: 10px; color: var(--muted); margin-top: 4px; min-height: 14px; text-align: center; }
+
+        /* Filters */
+        .filter-group { margin-bottom: 8px; }
+        .filter-group label { display: block; font-size: 10px; color: var(--muted); margin-bottom: 3px; }
+        .filter-group select, .filter-group input[type=range] {
+            width: 100%; background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px; color: var(--text);
+            padding: 5px 7px; font-size: 11px;
+            font-family: inherit; outline: none;
+            transition: border-color .2s;
+        }
+        .filter-group select:focus { border-color: var(--accent); }
+        .filter-group option { background: var(--surface2); }
+        .filter-group .tag {
+            display: inline-block; font-size: 9px; padding: 1px 5px;
+            border-radius: 4px; background: rgba(139,92,246,.15);
+            color: #c4b5fd; margin-left: 4px; vertical-align: middle;
+        }
+        .filter-actions { display: flex; gap: 6px; margin-top: 8px; }
+        .filter-actions .btn { flex: 1; justify-content: center; font-size: 11px; }
+
+        /* Stat pills */
+        .stat-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .stat-pill { background: var(--bg); border-radius: 7px; padding: 8px; text-align: center; }
+        .stat-pill .val { font-size: 16px; font-weight: 700; color: var(--accent); }
+        .stat-pill .lbl { font-size: 9px; color: var(--muted); margin-top: 1px; }
+
+        /* ── CONTENT ─────────────────────────────────────────────── */
+        .content-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .tab-panel { display: none; flex: 1; overflow: hidden; }
+        .tab-panel.active { display: flex; flex-direction: column; }
+
+        /* ── DASHBOARD / METAS shared scroll ─────────────────────── */
+        .dash-scroll {
+            flex: 1; overflow-y: auto; padding: 18px 22px;
+            scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+        }
+
+        /* KPI cards */
+        .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+        .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px 14px; position: relative; overflow: hidden; }
+        .kpi-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 12px 12px 0 0; }
+        .kpi-card.green::after  { background: linear-gradient(90deg,#10b981,#059669); }
+        .kpi-card.cyan::after   { background: linear-gradient(90deg,#06b6d4,#0284c7); }
+        .kpi-card.amber::after  { background: linear-gradient(90deg,#f59e0b,#d97706); }
+        .kpi-card.violet::after { background: linear-gradient(90deg,#8b5cf6,#7c3aed); }
+        .kpi-card.rose::after   { background: linear-gradient(90deg,#f43f5e,#e11d48); }
+        .kpi-icon { font-size: 22px; margin-bottom: 6px; display: block; }
+        .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+        .kpi-value { font-size: 22px; font-weight: 800; margin-top: 3px; line-height: 1; }
+        .kpi-card.green  .kpi-value { color: #34d399; }
+        .kpi-card.cyan   .kpi-value { color: #22d3ee; }
+        .kpi-card.amber  .kpi-value { color: #fcd34d; }
+        .kpi-card.violet .kpi-value { color: #c4b5fd; }
+        .kpi-card.rose   .kpi-value { color: #fb7185; }
+        .kpi-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+        /* Charts grid */
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+        .chart-card.full { grid-column: 1 / -1; }
+        .chart-header { margin-bottom: 14px; }
+        .chart-title { font-size: 13px; font-weight: 600; color: var(--text); }
+        .chart-subtitle { font-size: 10px; color: var(--muted); margin-top: 2px; }
+        .chart-wrap { position: relative; }
+
+        /* Empty state */
+        .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 340px; color: var(--muted); font-size: 14px; }
+        .empty-state .ei { font-size: 48px; opacity: .3; }
+        .empty-state p { color: #475569; font-size: 12px; }
+
+        /* ── METAS TABLE ─────────────────────────────────────────── */
+        .metas-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .metas-table th { color: var(--muted); text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+        .metas-table td { padding: 7px 10px; border-bottom: 1px solid #1a2537; color: var(--text); }
+        .metas-table tr:hover td { background: rgba(255,255,255,.03); }
+        .metas-table tr:last-child td { border-bottom: none; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+        .badge-green  { background: rgba(16,185,129,.15);  color: #34d399; }
+        .badge-yellow { background: rgba(245,158,11,.15);  color: #fcd34d; }
+        .badge-red    { background: rgba(239,68,68,.15);   color: #f87171; }
+
+        /* ── DB BROWSER ──────────────────────────────────────────── */
+        .db-stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+        .db-stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
+        .db-stat-icon { font-size: 28px; }
+        .db-stat-info { flex: 1; }
+        .db-stat-val  { font-size: 22px; font-weight: 800; color: var(--text); }
+        .db-stat-lbl  { font-size: 10px; color: var(--muted); margin-top: 2px; }
+        .db-browser   { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .db-browser-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); gap: 12px; flex-wrap: wrap; }
+        .db-toolbar   { display: flex; align-items: center; gap: 8px; }
+        .db-search-input { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; color: var(--text); padding: 5px 10px; font-size: 12px; font-family: inherit; outline: none; width: 210px; transition: border-color .2s; }
+        .db-search-input:focus { border-color: var(--accent); }
+        .db-per-page  { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; color: var(--text); padding: 5px 8px; font-size: 12px; font-family: inherit; outline: none; cursor: pointer; }
+        .db-table     { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .db-table th  { color: var(--muted); text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; position: sticky; top: 0; background: var(--surface); z-index: 2; }
+        .db-table td  { padding: 7px 12px; border-bottom: 1px solid #1a2537; color: var(--text); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+        .db-table tr:hover td { background: rgba(255,255,255,.03); }
+        .db-table tr:last-child td { border-bottom: none; }
+        .db-pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--border); }
+        .db-null      { color: #475569; font-style: italic; }
+        /* Edit modal */
+        .db-modal       { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 8000; display: flex; align-items: center; justify-content: center; }
+        .db-modal-inner { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; width: min(720px, 95vw); max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+        .db-modal-header{ display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+        .db-modal-title { font-size: 15px; font-weight: 600; }
+        .db-modal-body  { flex: 1; overflow-y: auto; padding: 18px 20px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+        .db-modal-footer{ padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+        .db-form-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
+        .db-form-field  { display: flex; flex-direction: column; gap: 4px; }
+        .db-form-field label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+        .db-form-field input[type=text],
+        .db-form-field input[type=number] { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; color: var(--text); padding: 6px 10px; font-size: 12px; font-family: inherit; outline: none; transition: border-color .2s; }
+        .db-form-field input:focus { border-color: var(--accent); }
+        .db-form-field input[type=checkbox] { width: 16px; height: 16px; margin-top: 4px; accent-color: var(--accent); cursor: pointer; }
+        @media (max-width: 700px) { .db-form-grid { grid-template-columns: 1fr; } .db-stats-row { grid-template-columns: 1fr; } }
+
+        /* ── MAP TAB ──────────────────────────────────────────────── */
+        .map-layout { flex: 1; display: flex; overflow: hidden; }
+        .map-sidebar { width: 236px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+        .map-area { flex: 1; position: relative; }
+        #map { width: 100%; height: 100%; }
+        .map-overlay-btns { position: absolute; top: 10px; right: 10px; z-index: 800; display: flex; flex-direction: column; gap: 6px; }
+        .map-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 7px 11px; border-radius: 7px; font-size: 11px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .2s; display: flex; align-items: center; gap: 5px; }
+        .map-btn:hover { background: var(--surface2); }
+        .map-btn.active { background: var(--warn); border-color: var(--warn); color: #fff; }
+
+        /* Toggles */
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .toggle-row label { font-size: 11px; color: #cbd5e1; }
+        .toggle { position: relative; width: 36px; height: 18px; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 20px; cursor: pointer; transition: .3s; }
+        .toggle-slider::before { content:''; position:absolute; width:12px; height:12px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.3s; }
+        .toggle input:checked + .toggle-slider { background: var(--accent); }
+        .toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+        /* Legend */
+        .legend-item { display:flex; align-items:center; gap:7px; font-size:11px; color:#cbd5e1; margin-bottom:5px; }
+        .legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; border:1.5px solid rgba(255,255,255,.2); }
+
+        /* Leaflet popup */
+        .leaflet-popup-content-wrapper { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 10px !important; color: var(--text) !important; box-shadow: 0 8px 32px rgba(0,0,0,.5) !important; }
+        .leaflet-popup-tip { background: var(--surface) !important; }
+        .popup-row { display:flex; justify-content:space-between; font-size:11px; padding:3px 0; border-bottom:1px solid #2d3f55; }
+        .popup-row:last-child { border-bottom:none; }
+        .popup-row .k { color:var(--muted); } .popup-row .v { color:var(--text); font-weight:500; }
+
+        /* Loading */
+        .loading-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.87); display: none; align-items: center; justify-content: center; z-index: 9000; flex-direction: column; gap: 14px; }
         .loading-overlay.show { display: flex; }
-        .spinner {
-            width: 36px; height: 36px;
-            border: 3px solid #334155;
-            border-top-color: #10b981;
-            border-radius: 50%;
-            animation: spin .8s linear infinite;
-        }
+        .spinner { width: 38px; height: 38px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-msg { font-size: 13px; color: #94a3b8; }
 
-        /* Toast notifications */
-        .toast-container {
-            position: fixed; bottom: 20px; right: 20px;
-            z-index: 9999; display: flex; flex-direction: column; gap: 8px;
-        }
-        .toast {
-            background: #1e293b; border: 1px solid #334155;
-            border-radius: 10px; padding: 12px 16px;
-            font-size: 13px; min-width: 260px;
-            animation: slideIn .3s ease;
-            display: flex; align-items: center; gap: 10px;
-        }
-        .toast.success { border-color: #10b981; }
-        .toast.error { border-color: #ef4444; }
-        .toast.info { border-color: #10b981; }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
+        /* Toasts */
+        .toast-container { position: fixed; bottom: 18px; right: 18px; z-index: 9999; display: flex; flex-direction: column; gap: 6px; }
+        .toast { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 12px; min-width: 240px; animation: slideIn .25s ease; display: flex; align-items: center; gap: 8px; }
+        .toast.success { border-color: var(--accent); }
+        .toast.error   { border-color: var(--danger); }
+        .toast.warning { border-color: var(--warn); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        /* Popup styles */
-        .leaflet-popup-content-wrapper {
-            background: #1e293b !important;
-            border: 1px solid #334155 !important;
-            border-radius: 10px !important;
-            color: #e2e8f0 !important;
-            box-shadow: 0 8px 32px rgba(0,0,0,.5) !important;
-        }
-        .leaflet-popup-tip { background: #1e293b !important; }
-        .popup-content h4 { font-size: 13px; font-weight: 600; color: #f1f5f9; margin-bottom: 8px; }
-        .popup-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; border-bottom: 1px solid #2d3f55; }
-        .popup-row:last-child { border-bottom: none; }
-        .popup-row .key { color: #64748b; }
-        .popup-row .val { color: #e2e8f0; font-weight: 500; text-align: right; max-width: 140px; }
-        .tipo-badge {
-            display: inline-block; padding: 2px 8px; border-radius: 20px;
-            font-size: 10px; font-weight: 600; text-transform: uppercase;
-        }
+        /* Statusbar */
+        .statusbar { background: var(--bg); border-top: 1px solid #1a2537; padding: 3px 16px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 10px; color: #475569; flex-shrink: 0; }
+        .statusbar strong { color: #94a3b8; }
 
-        /* Sidebar toggle on topbar */
-        .sidebar-toggle-btn {
-            background: transparent; border: 1px solid #334155;
-            color: #94a3b8; padding: 6px 10px; border-radius: 6px;
-            cursor: pointer; font-size: 16px; transition: all .2s;
-        }
-        .sidebar-toggle-btn:hover { background: #1e293b; color: #e2e8f0; }
+        /* Heatmap controls */
+        #heatmapControls { display:none; margin-top:8px; border-top:1px solid var(--border); padding-top:8px; }
 
-        /* Status bar */
-        .status-bar {
-            background: #0f172a; border-top: 1px solid #1e293b;
-            padding: 4px 16px; display: flex; gap: 16px;
-            font-size: 11px; color: #475569; flex-shrink: 0;
+        @media (max-width: 960px) {
+            .kpi-row { grid-template-columns: 1fr 1fr; }
+            .charts-grid { grid-template-columns: 1fr; }
         }
-        .status-bar span strong { color: #94a3b8; }
     </style>
 </head>
 <body>
 
-<!-- TOPBAR -->
+<!-- ── TOPBAR ─────────────────────────────────────────────────────── -->
 <div class="topbar">
     <div class="topbar-brand">
-        <button class="sidebar-toggle-btn" id="sidebarToggle" title="Ocultar/Mostrar painel">☰</button>
+        <button class="btn btn-outline btn-sm" id="sidebarToggle">☰</button>
         <div class="logo-icon">💰</div>
-        <div>
+        <div class="brand-text">
             <h1>Faturamento Platform</h1>
-            <span>Mapa de Faturamento de Ligações</span>
+            <span>Dashboard Analítico</span>
         </div>
     </div>
-    <div class="topbar-actions">
-        <button class="btn btn-outline btn-sm" id="btnFitBounds">⊕ Ajustar mapa</button>
-        <button class="btn btn-outline btn-sm" id="btnResetFilters">✕ Limpar filtros</button>
-        <button class="btn btn-primary btn-sm" id="btnRefresh">↻ Atualizar</button>
+
+    <div class="tab-nav">
+        <button class="tab-btn active" id="tabDashBtn"  onclick="switchTab('dash')">📊 Dashboard</button>
+        <button class="tab-btn"        id="tabMetasBtn" onclick="switchTab('metas')">📈 Metas</button>
+        <button class="tab-btn"        id="tabMapBtn"   onclick="switchTab('map')">🗺️ Mapa</button>
+        <button class="tab-btn"        id="tabDbBtn"    onclick="switchTab('db')">🗄️ Banco</button>
+    </div>
+
+    <div class="topbar-right">
+        <button class="btn btn-outline  btn-sm" id="btnResetAll">✕ Limpar filtros</button>
+        <button class="btn btn-primary  btn-sm" id="btnRefresh">↻ Atualizar</button>
     </div>
 </div>
 
-<!-- MAIN -->
-<div class="main">
+<!-- ── BODY ───────────────────────────────────────────────────────── -->
+<div class="app-body">
 
     <!-- SIDEBAR -->
     <div class="sidebar" id="sidebar">
@@ -337,651 +365,1280 @@
 
             <!-- Upload -->
             <div class="sidebar-section">
-                <h3>📂 Importar Dados</h3>
+                <div class="sec-title">📂 Importar Dados</div>
+                <div class="upload-tabs">
+                    <button class="upload-tab-btn active-fat" id="btnTabFat"  onclick="selectTabUpload('faturamento')">💰 Faturam.</button>
+                    <button class="upload-tab-btn"            id="btnTabVol"  onclick="selectTabUpload('volume')">💧 Volume</button>
+                    <button class="upload-tab-btn"            id="btnTabMeta" onclick="selectTabUpload('meta')">📋 Meta</button>
+                </div>
+                <input type="hidden" id="tipoTabela" value="faturamento" />
                 <div class="upload-area" id="uploadArea">
                     <input type="file" id="fileInput" accept=".xlsx,.xls" />
                     <div class="upload-icon">📊</div>
-                    <p><strong>Clique ou arraste</strong> o arquivo Excel<br/>(.xlsx ou .xls)</p>
+                    <p><strong>Clique ou arraste</strong><br/>.xlsx / .xls</p>
                 </div>
                 <div class="progress-bar-wrap" id="progressWrap">
                     <div class="progress-bar" id="progressBar"></div>
                 </div>
+                <div class="upload-status" id="uploadStatus"></div>
             </div>
 
-            <!-- Stats -->
-            <div class="sidebar-section" id="statsSection" style="display:none">
-                <h3>📈 Estatísticas</h3>
-                <div class="stats-grid">
-                    <div class="stat-pill">
-                        <div class="val" id="statTotal">0</div>
-                        <div class="lbl">Total registros</div>
-                    </div>
-                    <div class="stat-pill">
-                        <div class="val" id="statCoords">0</div>
-                        <div class="lbl">Com localização</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Filtros -->
+            <!-- Filters -->
             <div class="sidebar-section">
-                <h3>🔍 Filtros</h3>
-                <div class="filter-group">
-                    <label>Tipo de Faturamento</label>
-                    <select id="filtroTipo">
-                        <option value="">Todos</option>
-                    </select>
-                </div>
+                <div class="sec-title">🔍 Filtros</div>
                 <div class="filter-group">
                     <label>Cidade</label>
-                    <select id="filtroCidade">
-                        <option value="">Todas</option>
-                    </select>
+                    <select id="filtroCidade"><option value="">Todas</option></select>
                 </div>
                 <div class="filter-group">
                     <label>Macro Região</label>
-                    <select id="filtroMacro">
-                        <option value="">Todas</option>
-                    </select>
+                    <select id="filtroMacro"><option value="">Todas</option></select>
                 </div>
                 <div class="filter-group">
-                    <label>Grande Consumidor (GC)</label>
-                    <div style="display:flex;gap:12px;margin-top:6px;flex-wrap:wrap">
-                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px">
-                            <input type="radio" name="gcFilter" value="" checked style="accent-color:#10b981"> Todos
-                        </label>
-                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px">
-                            <input type="radio" name="gcFilter" value="SIM" style="accent-color:#d4af37"> Somente GC
-                        </label>
-                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px">
-                            <input type="radio" name="gcFilter" value="NAO" style="accent-color:#10b981"> Excluir GC
-                        </label>
-                    </div>
+                    <label>Micro Região</label>
+                    <select id="filtroMicro"><option value="">Todas</option></select>
                 </div>
                 <div class="filter-group">
-                    <label>Máx. pontos: <strong id="maxPontosVal">30.000</strong></label>
-                    <input type="range" id="maxPontos" min="1000" max="100000" value="30000" step="1000" style="width:100%;accent-color:#10b981;margin-top:4px">
+                    <label>Classe de Rubrica</label>
+                    <select id="filtroClasse"><option value="">Todas</option></select>
                 </div>
-                <button class="btn btn-primary" style="width:100%;margin-top:6px" id="btnAplicarFiltros">
-                    Aplicar Filtros
-                </button>
+                <div class="filter-group">
+                    <label>Grupo de Rubrica</label>
+                    <select id="filtroGrupo"><option value="">Todos</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Cod. Grupo</label>
+                    <select id="filtroCodGrupo"><option value="">Todos</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Agrupador <span class="tag">Metas</span></label>
+                    <select id="filtroAgrupador"><option value="">Todos</option></select>
+                </div>
+                <div class="filter-actions">
+                    <button class="btn btn-primary btn-sm" id="btnAplicar">Aplicar</button>
+                    <button class="btn btn-outline btn-sm" id="btnLimpar">Limpar</button>
+                </div>
             </div>
 
-            <!-- Layers -->
-            <div class="sidebar-section">
-                <h3>🗺️ Camadas</h3>
-                <div class="toggle-row">
-                    <label>Mostrar pontos</label>
-                    <label class="toggle">
-                        <input type="checkbox" id="togglePontos" checked />
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-                <div class="toggle-row">
-                    <label>Agrupar marcadores</label>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleCluster" checked />
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-                <div class="toggle-row">
-                    <label>🔥 Mapa de calor (Faturamento R$)</label>
-                    <label class="toggle">
-                        <input type="checkbox" id="toggleHeatmap" />
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-                <!-- Heatmap sub-controls (shown only when toggle is on) -->
-                <div id="heatmapControls" style="display:none;margin-top:10px;border-top:1px solid #334155;padding-top:10px">
-                    <div class="filter-group" style="margin-bottom:8px">
-                        <label style="font-size:12px">🏙️ Cidade (mapa de calor)</label>
-                        <select id="heatmapCidade" style="width:100%;margin-top:4px">
-                            <option value="">Todas as cidades</option>
-                        </select>
+            <!-- Data summary -->
+            <div class="sidebar-section" id="summarySection" style="display:none">
+                <div class="sec-title">📊 Resumo</div>
+                <div class="stat-pills">
+                    <div class="stat-pill">
+                        <div class="val" id="sumRegs">—</div>
+                        <div class="lbl">Registros</div>
                     </div>
-                    <div class="filter-group">
-                        <label style="font-size:12px">Valor mínimo (R$): <strong id="heatmapValMinVal">0</strong></label>
-                        <input type="range" id="heatmapValMin" min="0" max="5000" value="0" step="100"
-                               style="width:100%;accent-color:#f97316;margin-top:4px">
-                        <div style="display:flex;justify-content:space-between;font-size:10px;color:#64748b;margin-top:2px">
-                            <span>R$ 0</span><span style="color:#f59e0b">R$ 1.000</span><span>R$ 2.500</span><span>R$ 5.000+</span>
+                    <div class="stat-pill">
+                        <div class="val" id="sumLig">—</div>
+                        <div class="lbl">Ligações</div>
+                    </div>
+                    <div class="stat-pill" style="grid-column:1/-1">
+                        <div class="val" id="sumReceita" style="font-size:13px">—</div>
+                        <div class="lbl">Receita Total</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div class="content-area">
+
+        <!-- ── DASHBOARD TAB ─────────────────────────────────────── -->
+        <div class="tab-panel active" id="panelDash">
+            <div class="dash-scroll">
+
+                <div id="emptyState" class="empty-state">
+                    <div class="ei">📊</div>
+                    <div>Nenhum dado disponível</div>
+                    <p>Importe uma planilha de faturamento para visualizar o dashboard.</p>
+                </div>
+
+                <div id="dashContent" style="display:none">
+
+                    <div class="kpi-row">
+                        <div class="kpi-card green">
+                            <span class="kpi-icon">💰</span>
+                            <div class="kpi-label">Receita Total</div>
+                            <div class="kpi-value" id="kpiReceita">—</div>
+                            <div class="kpi-sub" id="kpiReceitaSub">&nbsp;</div>
+                        </div>
+                        <div class="kpi-card cyan">
+                            <span class="kpi-icon">🔗</span>
+                            <div class="kpi-label">Ligações Distintas</div>
+                            <div class="kpi-value" id="kpiLig">—</div>
+                            <div class="kpi-sub">números de ligação únicos</div>
+                        </div>
+                        <div class="kpi-card amber">
+                            <span class="kpi-icon">📑</span>
+                            <div class="kpi-label">Total de Registros</div>
+                            <div class="kpi-value" id="kpiRegs">—</div>
+                            <div class="kpi-sub">linhas de faturamento</div>
+                        </div>
+                        <div class="kpi-card violet">
+                            <span class="kpi-icon">📊</span>
+                            <div class="kpi-label">Ticket Médio / Ligação</div>
+                            <div class="kpi-value" id="kpiTicket">—</div>
+                            <div class="kpi-sub">receita média por ligação</div>
                         </div>
                     </div>
-                    <button class="btn btn-primary" id="btnAtualizarHeatmap"
-                            style="width:100%;margin-top:8px;font-size:12px;padding:6px">
-                        🔄 Atualizar mapa de calor
-                    </button>
+
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Por Classe de Rubrica</div>
+                                <div class="chart-subtitle">Faturamento (R$) por classe</div>
+                            </div>
+                            <div class="chart-wrap" style="min-height:160px">
+                                <canvas id="chartClasse"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Por Grupo de Rubrica</div>
+                                <div class="chart-subtitle">Top 10 grupos — R$ faturado</div>
+                            </div>
+                            <div class="chart-wrap" style="min-height:160px">
+                                <canvas id="chartGrupo"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Top Cidades</div>
+                                <div class="chart-subtitle">Top 15 cidades — R$ faturado</div>
+                            </div>
+                            <div class="chart-wrap" style="min-height:220px">
+                                <canvas id="chartCidade"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Por Macro Região</div>
+                                <div class="chart-subtitle">R$ faturado por macro</div>
+                            </div>
+                            <div class="chart-wrap" style="min-height:220px">
+                                <canvas id="chartMacro"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Top Micro Regiões</div>
+                                <div class="chart-subtitle">Top 15 micros — R$ faturado</div>
+                            </div>
+                            <div class="chart-wrap" style="min-height:220px">
+                                <canvas id="chartMicro"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Por Cod. Grupo</div>
+                                <div class="chart-subtitle">Top 10 — R$ faturado</div>
+                            </div>
+                            <div class="chart-wrap" style="min-height:220px">
+                                <canvas id="chartCodGrupo"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                </div><!-- /dashContent -->
+            </div><!-- /dash-scroll -->
+        </div><!-- /panelDash -->
+
+        <!-- ── METAS TAB ──────────────────────────────────────────── -->
+        <div class="tab-panel" id="panelMetas">
+            <div class="dash-scroll">
+
+                <div id="metasEmptyState" class="empty-state">
+                    <div class="ei">📋</div>
+                    <div>Nenhuma meta importada</div>
+                    <p>Importe a planilha de metas para visualizar o comparativo Realizado vs Meta.</p>
                 </div>
-            </div>
 
-            <!-- Legenda -->
-            <div class="sidebar-section">
-                <h3>🎨 Legenda — Tipo Faturamento</h3>
-                <div class="legend-items" id="legendItems">
-                    <div class="legend-item"><div class="legend-dot" style="background:#ff0000"></div> ÁGUA</div>
-                    <div class="legend-item"><div class="legend-dot" style="background:#008000"></div> ÁGUA + ESGOTO</div>
-                    <div class="legend-item"><div class="legend-dot" style="background:#ffa500"></div> ÁGUA + T.E.E</div>
-                    <div class="legend-item"><div class="legend-dot" style="background:#0000ff"></div> ÁGUA + ESGOTO + T.E.E</div>
-                    <div class="legend-item"><div class="legend-dot" style="background:#8b4513"></div> T.E.E</div>
-                    <div class="legend-item"><div class="legend-dot" style="background:#d4af37"></div> Grande Consumidor (GC)</div>
-                    <div class="legend-item"><div class="legend-dot" style="background:#808080"></div> Outros</div>
+                <div id="metasContent" style="display:none">
+
+                    <!-- KPI Row -->
+                    <div class="kpi-row">
+                        <div class="kpi-card violet">
+                            <span class="kpi-icon">🎯</span>
+                            <div class="kpi-label">Meta Total</div>
+                            <div class="kpi-value" id="kpiMetaTotal">—</div>
+                            <div class="kpi-sub" id="kpiMetaCidades">&nbsp;</div>
+                        </div>
+                        <div class="kpi-card green">
+                            <span class="kpi-icon">💰</span>
+                            <div class="kpi-label">Realizado</div>
+                            <div class="kpi-value" id="kpiMetaRealizado">—</div>
+                            <div class="kpi-sub">faturamento total no período</div>
+                        </div>
+                        <div class="kpi-card amber">
+                            <span class="kpi-icon">📊</span>
+                            <div class="kpi-label">% Atingimento Global</div>
+                            <div class="kpi-value" id="kpiMetaPct">—</div>
+                            <div class="kpi-sub" id="kpiMetaAcima">&nbsp;</div>
+                        </div>
+                        <div class="kpi-card rose">
+                            <span class="kpi-icon">⚠️</span>
+                            <div class="kpi-label">Gap (Meta — Real.)</div>
+                            <div class="kpi-value" id="kpiMetaGap">—</div>
+                            <div class="kpi-sub" id="kpiMetaGapSub">positivo = abaixo da meta</div>
+                        </div>
+                    </div>
+
+                    <!-- Charts -->
+                    <div class="charts-grid">
+
+                        <div class="chart-card full">
+                            <div class="chart-header">
+                                <div class="chart-title">Distribuição da Meta por Agrupador</div>
+                                <div class="chart-subtitle">Valor orçado (R$) por tipo de serviço</div>
+                            </div>
+                            <div class="chart-wrap" style="min-height:180px">
+                                <canvas id="chartMetaAgrupador"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">% Atingimento por Cidade</div>
+                                <div class="chart-subtitle">Pior desempenho primeiro • verde ≥ 100% • amarelo ≥ 80% • vermelho &lt; 80%</div>
+                            </div>
+                            <div class="chart-wrap" style="min-height:260px">
+                                <canvas id="chartMetaPct"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div class="chart-title">Top 15 Maiores Gaps</div>
+                                <div class="chart-subtitle">Meta − Realizado (R$) — maiores desvios</div>
+                            </div>
+                            <div class="chart-wrap" style="min-height:260px">
+                                <canvas id="chartMetaGap"></canvas>
+                            </div>
+                        </div>
+
+                    </div><!-- /charts-grid -->
+
+                    <!-- Ranking table -->
+                    <div class="chart-card" style="margin-top:16px">
+                        <div class="chart-header">
+                            <div class="chart-title">Ranking de Cidades por Performance</div>
+                            <div class="chart-subtitle">Ordenado por % de atingimento (melhor para pior)</div>
+                        </div>
+                        <div id="metasTable" style="overflow-x:auto; margin-top:4px;"></div>
+                    </div>
+
+                </div><!-- /metasContent -->
+            </div><!-- /dash-scroll -->
+        </div><!-- /panelMetas -->
+
+        <!-- ── MAP TAB ───────────────────────────────────────────── -->
+        <div class="tab-panel" id="panelMap">
+            <div class="map-layout">
+
+                <div class="map-sidebar">
+                    <div class="sidebar-section">
+                        <div class="sec-title">🗺️ Camadas</div>
+                        <div class="toggle-row">
+                            <label>Mostrar pontos</label>
+                            <label class="toggle"><input type="checkbox" id="togglePontos" checked /><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="toggle-row">
+                            <label>Agrupar marcadores</label>
+                            <label class="toggle"><input type="checkbox" id="toggleCluster" checked /><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="toggle-row">
+                            <label>🔥 Mapa de calor</label>
+                            <label class="toggle"><input type="checkbox" id="toggleHeatmap" /><span class="toggle-slider"></span></label>
+                        </div>
+                        <div id="heatmapControls">
+                            <div class="filter-group">
+                                <label>Cidade (calor)</label>
+                                <select id="heatmapCidade"><option value="">Todas</option></select>
+                            </div>
+                            <div class="filter-group">
+                                <label>Val. mín. (R$): <strong id="heatmapValMinVal">0</strong></label>
+                                <input type="range" id="heatmapValMin" min="0" max="5000" value="0" step="100" style="accent-color:#f97316" />
+                            </div>
+                            <button class="btn btn-primary btn-sm" style="width:100%;margin-top:6px" id="btnAtualizarHeatmap">🔄 Atualizar</button>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="sec-title">⚙️ Filtros do Mapa</div>
+                        <div class="filter-group">
+                            <label>Tipo de Faturamento</label>
+                            <select id="filtroTipo"><option value="">Todos</option></select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Máx. pontos: <strong id="maxPontosVal">30.000</strong></label>
+                            <input type="range" id="maxPontos" min="1000" max="100000" value="30000" step="1000" style="accent-color:#10b981" />
+                        </div>
+                        <button class="btn btn-primary btn-sm" style="width:100%;margin-top:6px" id="btnAplicarPontos">Aplicar no Mapa</button>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <div class="sec-title">🎨 Legenda</div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#ff0000"></div>ÁGUA</div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#008000"></div>ÁGUA + ESGOTO</div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#ffa500"></div>ÁGUA + T.E.E</div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#0000ff"></div>ÁGUA + ESGOTO + T.E.E</div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#8b4513"></div>T.E.E</div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#d4af37"></div>Grande Consumidor</div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#808080"></div>Outros</div>
+                    </div>
                 </div>
+
+                <div class="map-area">
+                    <div id="map"></div>
+                    <div class="map-overlay-btns">
+                        <button class="map-btn" id="btnHeatmapToggle">🔥 Mapa de Calor</button>
+                        <button class="map-btn" id="btnFitBounds">⊕ Ajustar</button>
+                    </div>
+                </div>
+
             </div>
+        </div><!-- /panelMap -->
 
-            <!-- Tabela por tipo -->
-            <div class="sidebar-section" id="tipoBreakdownSection" style="display:none">
-                <h3>📋 Por Tipo</h3>
-                <table class="tipo-table">
-                    <thead>
-                        <tr>
-                            <th>Tipo</th>
-                            <th style="text-align:right">Qtd</th>
-                            <th style="text-align:right">Fat. Total (R$)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tipoBreakdownBody"></tbody>
-                </table>
+        <!-- ── DB TAB ─────────────────────────────────────────── -->
+        <div class="tab-panel" id="panelDB">
+            <div class="dash-scroll">
+
+                <div class="db-stats-row">
+                    <div class="db-stat-card">
+                        <div class="db-stat-icon">💰</div>
+                        <div class="db-stat-info">
+                            <div class="db-stat-val" id="dbCountFat">—</div>
+                            <div class="db-stat-lbl">Registros · Faturamento</div>
+                        </div>
+                        <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444;flex-shrink:0" onclick="dbClear('faturamento')">🗑️ Limpar</button>
+                    </div>
+                    <div class="db-stat-card">
+                        <div class="db-stat-icon">💧</div>
+                        <div class="db-stat-info">
+                            <div class="db-stat-val" id="dbCountVol">—</div>
+                            <div class="db-stat-lbl">Registros · Volume</div>
+                        </div>
+                        <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444;flex-shrink:0" onclick="dbClear('volume')">🗑️ Limpar</button>
+                    </div>
+                    <div class="db-stat-card">
+                        <div class="db-stat-icon">📋</div>
+                        <div class="db-stat-info">
+                            <div class="db-stat-val" id="dbCountMeta">—</div>
+                            <div class="db-stat-lbl">Registros · Meta</div>
+                        </div>
+                        <button class="btn btn-outline btn-sm" style="color:#ef4444;border-color:#ef4444;flex-shrink:0" onclick="dbClear('meta_faturamento')">🗑️ Limpar</button>
+                    </div>
+                </div>
+
+                <div class="db-browser">
+                    <div class="db-browser-header">
+                        <div class="tab-nav" style="border:none;background:transparent;padding:0;gap:4px">
+                            <button class="tab-btn active" id="dbTabFat"  onclick="selectDbTable('faturamento')">💰 Faturamento</button>
+                            <button class="tab-btn"         id="dbTabVol"  onclick="selectDbTable('volume')">💧 Volume</button>
+                            <button class="tab-btn"         id="dbTabMeta" onclick="selectDbTable('meta_faturamento')">📋 Meta</button>
+                        </div>
+                        <div class="db-toolbar">
+                            <input type="text" id="dbSearch" placeholder="🔍 Pesquisar..." class="db-search-input" />
+                            <select id="dbPerPage" class="db-per-page">
+                                <option value="25">25 / pág</option>
+                                <option value="50" selected>50 / pág</option>
+                                <option value="100">100 / pág</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="dbTableWrap" style="overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 390px);min-height:200px">
+                        <div class="empty-state" id="dbEmptyState" style="min-height:200px">
+                            <div class="ei">🗄️</div>
+                            <div>Carregando dados...</div>
+                        </div>
+                        <table class="db-table" id="dbTable" style="display:none">
+                            <thead id="dbThead"></thead>
+                            <tbody id="dbTbody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="db-pagination" id="dbPagination" style="display:none">
+                        <button class="btn btn-outline btn-sm" id="dbPrevBtn" onclick="dbChangePage(-1)">◀ Anterior</button>
+                        <span id="dbPageInfo" style="font-size:11px;color:#94a3b8"></span>
+                        <button class="btn btn-outline btn-sm" id="dbNextBtn" onclick="dbChangePage(1)">Próximo ▶</button>
+                    </div>
+                </div>
+
             </div>
+        </div><!-- /panelDB -->
 
+    </div><!-- /content-area -->
+</div><!-- /app-body -->
+
+<!-- Statusbar -->
+<div class="statusbar">
+    <span><strong>Filtros:</strong> <span id="statusFiltro">Nenhum</span></span>
+    <span><strong>Pontos mapa:</strong> <span id="statusPontos">0</span></span>
+    <span><strong>Calor:</strong> <span id="statusHeatmap">Inativo</span></span>
+</div>
+
+<!-- DB Edit Modal -->
+<div class="db-modal" id="dbModal" style="display:none">
+    <div class="db-modal-inner">
+        <div class="db-modal-header">
+            <h3 class="db-modal-title" id="dbModalTitle">Editar Registro</h3>
+            <button class="btn btn-outline btn-sm" onclick="closeDbModal()">✕</button>
         </div>
-    </div>
-
-    <!-- MAP -->
-    <div class="map-wrap">
-        <div id="map"></div>
-
-        <!-- Map overlay controls -->
-        <div class="map-controls">
-            <button class="map-control-btn" id="btnHeatmapToggle" title="Ativar/desativar mapa de calor">
-                🔥 Mapa de Calor
-            </button>
-        </div>
-
-        <!-- Loading overlay -->
-        <div class="loading-overlay" id="loadingOverlay">
-            <div class="spinner"></div>
-            <span id="loadingText">Carregando dados...</span>
+        <div class="db-modal-body" id="dbModalBody"></div>
+        <div class="db-modal-footer">
+            <button class="btn btn-outline btn-sm" onclick="closeDbModal()">Cancelar</button>
+            <button class="btn btn-primary btn-sm" onclick="saveDbRow()">💾 Salvar</button>
         </div>
     </div>
 </div>
 
-<!-- Status bar -->
-<div class="status-bar">
-    <span><strong>Pontos visíveis:</strong> <span id="statusPontos">0</span></span>
-    <span><strong>Mapa de calor:</strong> <span id="statusHeatmap">Inativo</span></span>
-    <span><strong>Filtro ativo:</strong> <span id="statusFiltro">Nenhum</span></span>
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-msg" id="loadingMsg">Carregando...</div>
 </div>
 
-<!-- Toast container -->
+<!-- Toasts -->
 <div class="toast-container" id="toasts"></div>
 
-<!-- ── SCRIPTS (local) ──────────────────────────────────── -->
+<!-- ── SCRIPTS ───────────────────────────────────────────────────── -->
 <script src="/static/leaflet.js"></script>
 <script src="/static/leaflet.markercluster.js"></script>
 <script src="/static/leaflet-heat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <script>
-// ── CONFIG ────────────────────────────────────────────────
-const API = '';  // same origin
+'use strict';
 
-// ── 7-CLASS COLOR SYSTEM ─────────────────────────────────
-const CLASS_COLORS = {
-    'AGUA':            '#ff0000',  // vermelho
-    'AGUA_ESGOTO':     '#008000',  // verde
-    'TEE':             '#8b4513',  // marrom
-    'AGUA_TEE':        '#ffa500',  // laranja
-    'AGUA_ESGOTO_TEE': '#0000ff',  // azul
-    'GC':              '#d4af37',  // dourado
-    'OUTROS':          '#808080',  // cinza
-};
+const API = '';
 
-function classifyPonto(tipo, isGrande) {
-    if (String(isGrande || '').toUpperCase() === 'SIM') return 'GC';
-    const t = String(tipo || '').toUpperCase()
-                  .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const agua   = t.includes('AGUA');
-    const esgoto = t.includes('ESGOTO');
-    const tee    = t.includes('T.E.E');
-    if (agua && esgoto && tee) return 'AGUA_ESGOTO_TEE';
-    if (agua && esgoto)        return 'AGUA_ESGOTO';
-    if (agua && tee)           return 'AGUA_TEE';
-    if (tee)                   return 'TEE';
-    if (agua)                  return 'AGUA';
-    return 'OUTROS';
-}
-
-function getClassColor(classe) { return CLASS_COLORS[classe] || '#808080'; }
-function getDynamicColor(tipo, isGrande) { return getClassColor(classifyPonto(tipo, isGrande)); }
-
-function createCircleMarker(lat, lng, color) {
-    return L.circleMarker([lat, lng], {
-        radius: 7,
-        fillColor: color,
-        color: 'rgba(255,255,255,0.4)',
-        weight: 1.5,
-        opacity: 1,
-        fillOpacity: 0.85,
-    });
-}
-
-// ── MAP INIT ──────────────────────────────────────────────
-const map = L.map('map', {
-    center: [-15.7801, -47.9292],
-    zoom: 5,
-    zoomControl: true,
-});
-
-const tiles = {
-    dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO',
-        subdomains: 'abcd', maxZoom: 20
-    }),
-    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap',
-        maxZoom: 20
-    }),
-    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri',
-        maxZoom: 20
-    }),
-};
-tiles.dark.addTo(map);
-L.control.layers(
-    { 'Escuro': tiles.dark, 'OpenStreetMap': tiles.osm, 'Satélite': tiles.satellite },
-    {},
-    { position: 'bottomright' }
-).addTo(map);
-
-// ── STATE ─────────────────────────────────────────────────
-let markerClusterGroup = L.markerClusterGroup({ chunkedLoading: true, maxClusterRadius: 50 });
-let markersLayer = L.layerGroup();
-let heatLayer = null;
-let allMarkers = [];
-let heatmapActive = false;
-let clusterEnabled = true;
-let pontosAtivos = 0;
-
-map.addLayer(markerClusterGroup);
-
-// ── TOAST ─────────────────────────────────────────────────
-function toast(msg, type = 'info', duration = 3500) {
-    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+// ── UTILS ─────────────────────────────────────────────────────────
+function toast(msg, type = 'info', dur = 4000) {
+    const icons = { success:'✅', error:'❌', info:'ℹ️', warning:'⚠️' };
     const el = document.createElement('div');
     el.className = `toast ${type}`;
-    el.innerHTML = `<span>${icons[type] || 'ℹ️'}</span> ${msg}`;
+    el.innerHTML = `<span>${icons[type]||'ℹ️'}</span>${msg}`;
     document.getElementById('toasts').appendChild(el);
-    setTimeout(() => el.remove(), duration);
+    setTimeout(() => el.remove(), dur);
 }
 
-// ── LOADING ───────────────────────────────────────────────
-function setLoading(state, text = 'Carregando...') {
-    const el = document.getElementById('loadingOverlay');
-    document.getElementById('loadingText').textContent = text;
-    el.classList.toggle('show', state);
+function setLoading(on, text = 'Carregando...') {
+    document.getElementById('loadingMsg').textContent = text;
+    document.getElementById('loadingOverlay').classList.toggle('show', on);
 }
 
-// ── UPLOAD ────────────────────────────────────────────────
+function fmtBrl(v) {
+    return v != null
+        ? Number(v).toLocaleString('pt-BR', { style:'currency', currency:'BRL', maximumFractionDigits: 0 })
+        : '—';
+}
+function fmtNum(v) { return v != null ? Number(v).toLocaleString('pt-BR') : '—'; }
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────
+let mapReady = false;
+
+const TAB_MAP = {
+    dash:  { panel: 'panelDash',  btn: 'tabDashBtn'  },
+    metas: { panel: 'panelMetas', btn: 'tabMetasBtn' },
+    map:   { panel: 'panelMap',   btn: 'tabMapBtn'   },
+    db:    { panel: 'panelDB',    btn: 'tabDbBtn'    },
+};
+
+function switchTab(tab) {
+    Object.values(TAB_MAP).forEach(t => {
+        document.getElementById(t.panel).classList.remove('active');
+        document.getElementById(t.btn).classList.remove('active');
+    });
+    document.getElementById(TAB_MAP[tab].panel).classList.add('active');
+    document.getElementById(TAB_MAP[tab].btn).classList.add('active');
+
+    if (tab === 'map') {
+        if (!mapReady) { initMap(); mapReady = true; }
+        else setTimeout(() => map && map.invalidateSize(), 120);
+    }
+    if (tab === 'metas') loadMetas();
+    if (tab === 'db')    { loadDbStats(); dbLoadRows(); }
+}
+
+// ── UPLOAD TAB ────────────────────────────────────────────────────
+function selectTabUpload(tipo) {
+    document.getElementById('tipoTabela').value = tipo;
+    document.getElementById('btnTabFat').className  = 'upload-tab-btn' + (tipo === 'faturamento' ? ' active-fat'  : '');
+    document.getElementById('btnTabVol').className  = 'upload-tab-btn' + (tipo === 'volume'      ? ' active-vol'  : '');
+    document.getElementById('btnTabMeta').className = 'upload-tab-btn' + (tipo === 'meta'        ? ' active-meta' : '');
+}
+
 const uploadArea = document.getElementById('uploadArea');
-const fileInput = document.getElementById('fileInput');
+const fileInput  = document.getElementById('fileInput');
 
-uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
 uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
 uploadArea.addEventListener('drop', e => {
-    e.preventDefault();
-    uploadArea.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) handleUpload(file);
+    e.preventDefault(); uploadArea.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0]);
 });
-fileInput.addEventListener('change', e => {
-    if (e.target.files[0]) handleUpload(e.target.files[0]);
-});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleUpload(e.target.files[0]); });
 
 async function handleUpload(file) {
-    if (!file.name.match(/\.(xlsx|xls)$/i)) {
-        toast('Arquivo inválido. Use .xlsx ou .xls', 'error');
+    if (!file.name.match(/\.(xlsx|xls)$/i)) { toast('Arquivo inválido. Use .xlsx ou .xls', 'error'); return; }
+
+    const tipo   = document.getElementById('tipoTabela').value || 'faturamento';
+    const taskId = 'task_' + Date.now();
+    const label  = tipo === 'volume' ? 'Volume Operacional'
+                 : tipo === 'meta'   ? 'Meta de Faturamento'
+                 : 'Faturamento Líquido';
+
+    const wrap   = document.getElementById('progressWrap');
+    const bar    = document.getElementById('progressBar');
+    const status = document.getElementById('uploadStatus');
+
+    wrap.style.display = 'block';
+    bar.style.width    = '0%';
+    status.textContent = 'Preparando envio...';
+    setLoading(true, `Enviando ${label}...`);
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('tipo_tabela', tipo);
+    fd.append('task_id', taskId);
+
+    const xhr = await new Promise((res, rej) => {
+        const x = new XMLHttpRequest();
+        x.upload.addEventListener('progress', e => {
+            if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 50);
+                bar.style.width = pct + '%';
+                const msg = `Enviando arquivo... ${pct}%`;
+                status.textContent = msg;
+                document.getElementById('loadingMsg').textContent = msg;
+            }
+        });
+        x.addEventListener('load',  () => res(x));
+        x.addEventListener('error', () => rej(new Error('Falha na conexão')));
+        x.open('POST', `${API}/api/upload`);
+        x.send(fd);
+    }).catch(err => { toast(err.message, 'error'); setLoading(false); wrap.style.display='none'; return null; });
+
+    if (!xhr) return;
+
+    if (xhr.status !== 200) {
+        let detail = 'Erro no servidor';
+        try { detail = JSON.parse(xhr.responseText).detail || detail; } catch {}
+        toast(`Erro: ${detail}`, 'error');
+        setLoading(false); wrap.style.display='none'; status.textContent='';
         return;
     }
-    const wrap = document.getElementById('progressWrap');
-    const bar = document.getElementById('progressBar');
-    wrap.style.display = 'block';
-    bar.style.width = '30%';
 
-    setLoading(true, 'Importando planilha...');
-    const formData = new FormData();
-    formData.append('file', file);
+    bar.style.width = '55%';
+    document.getElementById('loadingMsg').textContent = 'Processando dados...';
+    status.textContent = 'Processando...';
 
-    try {
-        bar.style.width = '60%';
-        const res = await fetch(`${API}/api/upload`, { method: 'POST', body: formData });
-        const data = await res.json();
-        bar.style.width = '100%';
-        if (!res.ok) throw new Error(data.detail || 'Erro no upload');
-        toast(`${data.total} registros importados com sucesso!`, 'success');
-        await loadAll();
-    } catch (err) {
-        toast(`Erro: ${err.message}`, 'error');
-    } finally {
-        setLoading(false);
-        setTimeout(() => { wrap.style.display = 'none'; bar.style.width = '0'; }, 1000);
+    for (let i = 0; i < 300; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+            const pr = await fetch(`${API}/api/upload/progress/${taskId}`);
+            if (pr.ok) {
+                const p = await pr.json();
+                bar.style.width = Math.max(55, p.pct) + '%';
+                document.getElementById('loadingMsg').textContent = p.msg || 'Processando...';
+                status.textContent = p.msg || 'Processando...';
+                if (p.status === 'done' || p.status === 'error') break;
+            }
+        } catch {}
     }
+
+    bar.style.width = '100%';
+    let data = {};
+    try { data = JSON.parse(xhr.responseText); } catch {}
+    toast(`${(data.total||0).toLocaleString('pt-BR')} registros de ${label} importados!`, 'success');
+    status.textContent = `✓ ${(data.total||0).toLocaleString('pt-BR')} registros importados`;
+
+    setLoading(false);
+    setTimeout(() => { wrap.style.display='none'; bar.style.width='0%'; }, 1500);
+    await loadAll();
 }
 
-// ── LOAD ALL DATA ─────────────────────────────────────────
-async function loadAll() {
-    await Promise.all([loadFiltros(), loadStats(), loadPontos(), loadHeatmapIfActive()]);
+// ── FILTERS ───────────────────────────────────────────────────────
+function getFilters() {
+    return {
+        cidade:         document.getElementById('filtroCidade').value,
+        macro:          document.getElementById('filtroMacro').value,
+        micro:          document.getElementById('filtroMicro').value,
+        classe_rubrica: document.getElementById('filtroClasse').value,
+        grupo_rubrica:  document.getElementById('filtroGrupo').value,
+        cod_grupo:      document.getElementById('filtroCodGrupo').value,
+        agrupador:      document.getElementById('filtroAgrupador').value,
+    };
 }
 
-async function loadFiltros() {
-    try {
-        const res = await fetch(`${API}/api/filtros`);
-        const data = await res.json();
-        populateSelect('filtroTipo', data.tipos_faturamento);
-        populateSelect('filtroCidade', data.cidades);
-        populateSelect('filtroMacro', data.macros);
-        populateSelect('heatmapCidade', data.cidades, 'Todas as cidades');
-    } catch {}
+function filterParams() {
+    const f = getFilters();
+    const p = new URLSearchParams();
+    Object.entries(f).forEach(([k, v]) => { if (v !== '' && v != null) p.append(k, v); });
+    return p.toString();
+}
+
+function filterLabel() {
+    const f = getFilters();
+    const parts = [];
+    if (f.cidade)         parts.push(`Cidade: ${f.cidade}`);
+    if (f.macro)          parts.push(`Macro: ${f.macro}`);
+    if (f.micro)          parts.push(`Micro: ${f.micro}`);
+    if (f.classe_rubrica) parts.push(`Classe: ${f.classe_rubrica}`);
+    if (f.grupo_rubrica)  parts.push(`Grupo: ${f.grupo_rubrica}`);
+    if (f.cod_grupo)      parts.push(`CodGrupo: ${f.cod_grupo}`);
+    if (f.agrupador)      parts.push(`Agrupador: ${f.agrupador}`);
+    return parts.length ? parts.join(' | ') : 'Nenhum';
 }
 
 function populateSelect(id, items, allLabel = 'Todos') {
     const sel = document.getElementById(id);
     if (!sel) return;
-    const current = sel.value;
+    const cur = sel.value;
     sel.innerHTML = `<option value="">${allLabel}</option>`;
-    items.forEach(v => {
-        const opt = document.createElement('option');
-        opt.value = v; opt.textContent = v;
-        sel.appendChild(opt);
+    (items || []).forEach(v => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = v;
+        sel.appendChild(o);
     });
-    sel.value = current;
+    if (cur) sel.value = cur;
 }
 
-async function loadStats() {
+async function loadFiltros() {
     try {
-        const res = await fetch(`${API}/api/stats`);
-        const data = await res.json();
-        document.getElementById('statTotal').textContent = data.total.toLocaleString('pt-BR');
-        document.getElementById('statCoords').textContent = data.com_coords.toLocaleString('pt-BR');
-        document.getElementById('statsSection').style.display = '';
-
-        const tbody = document.getElementById('tipoBreakdownBody');
-        tbody.innerHTML = '';
-        data.by_tipo.forEach(item => {
-            const color = getDynamicColor(item.tipo);
-            const tr = document.createElement('tr');
-            const fatFmt = (item.total_fat || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
-            tr.innerHTML = `
-                <td><span class="tipo-dot" style="background:${color}"></span>${item.tipo}</td>
-                <td style="text-align:right">${item.qtd.toLocaleString('pt-BR')}</td>
-                <td style="text-align:right">${fatFmt}</td>`;
-            tbody.appendChild(tr);
-        });
-        document.getElementById('tipoBreakdownSection').style.display = '';
+        const r = await fetch(`${API}/api/filtros`);
+        const d = await r.json();
+        populateSelect('filtroCidade',    d.cidades         || [], 'Todas');
+        populateSelect('filtroMacro',     d.macros          || [], 'Todas');
+        populateSelect('filtroMicro',     d.micros          || [], 'Todas');
+        populateSelect('filtroClasse',    d.classes_rubrica || [], 'Todas');
+        populateSelect('filtroGrupo',     d.grupos_rubrica  || [], 'Todos');
+        populateSelect('filtroCodGrupo',  (d.cod_grupos||[]).map(String), 'Todos');
+        populateSelect('filtroAgrupador', d.agrupadores     || [], 'Todos');
+        populateSelect('filtroTipo',      d.tipos_faturamento || [], 'Todos');
+        populateSelect('heatmapCidade',   d.cidades         || [], 'Todas as cidades');
     } catch {}
 }
 
-// ── PONTOS (MARKERS) ──────────────────────────────────────
-async function loadPontos() {
-    setLoading(true, 'Carregando pontos no mapa...');
-    const params = buildParams();
-    try {
-        const res = await fetch(`${API}/api/pontos?${params}`);
-        const data = await res.json();
-        renderMarkers(data.data);
-        updateStatusBar(data.data.length, data.total);
-        const cidade = document.getElementById('filtroCidade').value;
-        if (cidade && allMarkers.length > 0) {
-            const group = L.featureGroup(allMarkers);
-            try { map.fitBounds(group.getBounds().pad(0.1)); } catch {}
-        }
-    } catch (err) {
-        toast('Erro ao carregar pontos', 'error');
-    } finally {
-        setLoading(false);
-    }
+// ── CHARTS ────────────────────────────────────────────────────────
+const PALETTE = [
+    '#10b981','#06b6d4','#6366f1','#f59e0b','#ef4444',
+    '#8b5cf6','#ec4899','#14b8a6','#f97316','#84cc16',
+    '#3b82f6','#a855f7','#22d3ee','#fb923c','#4ade80',
+];
+
+const charts = {};
+
+function destroyChart(id) {
+    if (charts[id]) { charts[id].destroy(); delete charts[id]; }
 }
 
-function buildParams() {
-    const params = new URLSearchParams();
-    const tipo   = document.getElementById('filtroTipo').value;
-    const cidade = document.getElementById('filtroCidade').value;
-    const macro  = document.getElementById('filtroMacro').value;
-    const gc     = document.querySelector('input[name="gcFilter"]:checked')?.value || '';
-    const limit  = document.getElementById('maxPontos')?.value || '30000';
-    if (tipo)   params.append('tipo_faturamento', tipo);
-    if (cidade) params.append('cidade', cidade);
-    if (macro)  params.append('macro', macro);
-    if (gc)     params.append('gc', gc);
-    params.append('limit', limit);
-    return params.toString();
+// Horizontal bar — single dataset
+function makeBarH(canvasId, labels, values) {
+    destroyChart(canvasId);
+    const ctx = document.getElementById(canvasId);
+    if (!ctx || !labels.length) return;
+
+    const colors = labels.map((_, i) => PALETTE[i % PALETTE.length]);
+    const h = Math.max(160, labels.length * 32 + 40);
+    ctx.parentElement.style.minHeight = h + 'px';
+
+    charts[canvasId] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors.map(c => c + 'bb'),
+                borderColor: colors,
+                borderWidth: 1,
+                borderRadius: 4,
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1,
+                    titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+                    callbacks: { label: ctx => '  ' + fmtBrl(ctx.parsed.x) }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: '#1a2840' },
+                    ticks: {
+                        color: '#64748b', font: { size: 10 },
+                        callback: v => {
+                            if (Math.abs(v) >= 1e6) return 'R$ ' + (v/1e6).toFixed(1) + 'M';
+                            if (Math.abs(v) >= 1e3) return 'R$ ' + (v/1e3).toFixed(0) + 'k';
+                            return 'R$ ' + v;
+                        }
+                    },
+                    border: { color: '#334155' }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: {
+                        color: '#94a3b8', font: { size: 10 },
+                        callback: function(val) {
+                            const lbl = this.getLabelForValue(val);
+                            return lbl && lbl.length > 30 ? lbl.substr(0,30) + '…' : lbl;
+                        }
+                    },
+                    border: { color: '#334155' }
+                }
+            },
+            layout: { padding: { right: 10 } }
+        }
+    });
+}
+
+// Horizontal bar — % values, color-coded by performance
+function makePctBarH(canvasId, labels, values) {
+    destroyChart(canvasId);
+    const ctx = document.getElementById(canvasId);
+    if (!ctx || !labels.length) return;
+
+    const h = Math.max(160, labels.length * 28 + 40);
+    ctx.parentElement.style.minHeight = h + 'px';
+
+    const bg  = values.map(v => v >= 100 ? '#10b981bb' : v >= 80 ? '#f59e0bbb' : '#ef4444bb');
+    const brd = values.map(v => v >= 100 ? '#10b981'   : v >= 80 ? '#f59e0b'   : '#ef4444');
+
+    charts[canvasId] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{ data: values, backgroundColor: bg, borderColor: brd, borderWidth: 1, borderRadius: 4, borderSkipped: false }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1,
+                    titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+                    callbacks: { label: ctx => `  ${ctx.parsed.x.toFixed(1)}%` }
+                }
+            },
+            scales: {
+                x: {
+                    min: 0,
+                    grid: { color: '#1a2840' },
+                    border: { color: '#334155' },
+                    ticks: { color: '#64748b', font: { size: 10 }, callback: v => v + '%' }
+                },
+                y: {
+                    grid: { display: false },
+                    border: { color: '#334155' },
+                    ticks: {
+                        color: '#94a3b8', font: { size: 10 },
+                        callback: function(val) {
+                            const lbl = this.getLabelForValue(val);
+                            return lbl && lbl.length > 25 ? lbl.substr(0,25) + '…' : lbl;
+                        }
+                    }
+                }
+            },
+            layout: { padding: { right: 10 } }
+        }
+    });
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────
+async function loadDashboard() {
+    const params = filterParams();
+    try {
+        const r = await fetch(`${API}/api/dashboard?${params}`);
+        if (!r.ok) return;
+        const d = await r.json();
+
+        document.getElementById('kpiReceita').textContent = fmtBrl(d.kpis.receita_total);
+        document.getElementById('kpiLig').textContent     = fmtNum(d.kpis.ligacoes_distintas);
+        document.getElementById('kpiRegs').textContent    = fmtNum(d.kpis.qtd_registros);
+        document.getElementById('kpiTicket').textContent  = fmtBrl(d.kpis.ticket_medio);
+
+        const hasData = (d.kpis.qtd_registros || 0) > 0;
+        document.getElementById('emptyState').style.display   = hasData ? 'none' : '';
+        document.getElementById('dashContent').style.display  = hasData ? ''     : 'none';
+        document.getElementById('summarySection').style.display = hasData ? '' : 'none';
+        if (hasData) {
+            document.getElementById('sumRegs').textContent    = fmtNum(d.kpis.qtd_registros);
+            document.getElementById('sumLig').textContent     = fmtNum(d.kpis.ligacoes_distintas);
+            document.getElementById('sumReceita').textContent = fmtBrl(d.kpis.receita_total);
+        }
+
+        document.getElementById('statusFiltro').textContent = filterLabel();
+
+        if (!hasData) return;
+
+        const L = arr => arr.map(r => r.label);
+        const V = arr => arr.map(r => r.valor);
+
+        makeBarH('chartClasse',   L(d.by_classe_rubrica), V(d.by_classe_rubrica));
+        makeBarH('chartGrupo',    L(d.by_grupo_rubrica),  V(d.by_grupo_rubrica));
+        makeBarH('chartCidade',   L(d.by_cidade),         V(d.by_cidade));
+        makeBarH('chartMacro',    L(d.by_macro),          V(d.by_macro));
+        makeBarH('chartMicro',    L(d.by_micro),          V(d.by_micro));
+        makeBarH('chartCodGrupo', L(d.by_cod_grupo).map(String), V(d.by_cod_grupo));
+    } catch(e) { console.error('dashboard error', e); }
+}
+
+// ── METAS ─────────────────────────────────────────────────────────
+async function loadMetas() {
+    const params = filterParams();
+    try {
+        const r = await fetch(`${API}/api/metas?${params}`);
+        if (!r.ok) return;
+        const d = await r.json();
+
+        const hasData = (d.kpis.cidades_meta || 0) > 0;
+        document.getElementById('metasEmptyState').style.display = hasData ? 'none' : '';
+        document.getElementById('metasContent').style.display    = hasData ? ''     : 'none';
+        if (!hasData) return;
+
+        // KPIs
+        document.getElementById('kpiMetaTotal').textContent    = fmtBrl(d.kpis.meta_total);
+        document.getElementById('kpiMetaRealizado').textContent = fmtBrl(d.kpis.realizado);
+        document.getElementById('kpiMetaCidades').textContent   = `${d.kpis.cidades_meta} cidades orçadas`;
+        document.getElementById('kpiMetaAcima').textContent     = `${d.kpis.cidades_acima} acima da meta`;
+
+        const pct = d.kpis.pct_atingimento;
+        const pctEl = document.getElementById('kpiMetaPct');
+        pctEl.textContent = pct != null ? pct.toFixed(1) + '%' : '—';
+        pctEl.style.color = pct >= 100 ? '#34d399' : pct >= 80 ? '#fcd34d' : '#f87171';
+
+        const gap = d.kpis.gap;
+        document.getElementById('kpiMetaGap').textContent    = fmtBrl(gap);
+        document.getElementById('kpiMetaGapSub').textContent =
+            gap > 0 ? 'abaixo da meta ⚠️' : gap < 0 ? 'acima da meta ✓' : 'meta atingida';
+
+        // Chart 1: Meta por Agrupador
+        const ag = d.by_agrupador || [];
+        makeBarH('chartMetaAgrupador', ag.map(r => r.agrupador), ag.map(r => r.meta));
+
+        // Chart 2: % atingimento por cidade (pior primeiro, top 20)
+        const cidPct = [...(d.by_cidade || [])].sort((a,b) => a.pct_atingimento - b.pct_atingimento).slice(0, 20);
+        makePctBarH('chartMetaPct', cidPct.map(r => r.cidade), cidPct.map(r => r.pct_atingimento || 0));
+
+        // Chart 3: Top 15 maiores gaps (meta > realizado)
+        const cidGap = [...(d.by_cidade || [])].sort((a,b) => b.gap - a.gap).slice(0, 15);
+        makeBarH('chartMetaGap', cidGap.map(r => r.cidade), cidGap.map(r => r.gap || 0));
+
+        // Ranking table
+        renderMetasTable(d.by_cidade || []);
+
+    } catch(e) { console.error('metas error', e); }
+}
+
+function renderMetasTable(rows) {
+    const sorted = [...rows].sort((a, b) => b.pct_atingimento - a.pct_atingimento);
+    let tbody = '';
+    sorted.forEach((r, i) => {
+        const pct   = r.pct_atingimento || 0;
+        const badge = pct >= 100
+            ? '<span class="badge badge-green">Acima</span>'
+            : pct >= 80
+            ? '<span class="badge badge-yellow">Próximo</span>'
+            : '<span class="badge badge-red">Abaixo</span>';
+        const pctColor = pct >= 100 ? '#34d399' : pct >= 80 ? '#fcd34d' : '#f87171';
+        tbody += `<tr>
+            <td>${i+1}</td>
+            <td>${r.cidade||'—'}</td>
+            <td>${r.macro||'—'}</td>
+            <td>${fmtBrl(r.meta)}</td>
+            <td>${fmtBrl(r.realizado)}</td>
+            <td style="color:${pctColor};font-weight:700">${pct.toFixed(1)}%</td>
+            <td>${fmtBrl(r.gap)}</td>
+            <td>${badge}</td>
+        </tr>`;
+    });
+    document.getElementById('metasTable').innerHTML =
+        `<table class="metas-table">
+            <thead>
+                <tr>
+                    <th>#</th><th>Cidade</th><th>Macro</th>
+                    <th>Meta</th><th>Realizado</th>
+                    <th>% Ating.</th><th>Gap</th><th>Status</th>
+                </tr>
+            </thead>
+            <tbody>${tbody}</tbody>
+        </table>`;
+}
+
+// ── DATABASE BROWSER ─────────────────────────────────────────────
+let dbCurrentTable = 'faturamento';
+let dbPage         = 1;
+let dbPages        = 1;
+let dbRowCache     = {};
+let dbEditId       = null;
+let dbEditTable    = null;
+
+function _dbDebounce(fn, ms) {
+    let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+async function loadDbStats() {
+    try {
+        const r = await fetch(`${API}/api/db/tables`);
+        const d = await r.json();
+        document.getElementById('dbCountFat').textContent  = fmtNum(d.faturamento      || 0);
+        document.getElementById('dbCountVol').textContent  = fmtNum(d.volume           || 0);
+        document.getElementById('dbCountMeta').textContent = fmtNum(d.meta_faturamento || 0);
+    } catch {}
+}
+
+function selectDbTable(table) {
+    dbCurrentTable = table;
+    dbPage = 1;
+    const map = { faturamento:'dbTabFat', volume:'dbTabVol', meta_faturamento:'dbTabMeta' };
+    Object.entries(map).forEach(([t, btnId]) =>
+        document.getElementById(btnId).classList.toggle('active', t === table)
+    );
+    document.getElementById('dbSearch').value = '';
+    dbLoadRows();
+}
+
+async function dbLoadRows() {
+    const q       = document.getElementById('dbSearch').value.trim();
+    const perPage = document.getElementById('dbPerPage').value;
+    const params  = new URLSearchParams({ page: dbPage, per_page: perPage });
+    if (q) params.append('q', q);
+    try {
+        const r = await fetch(`${API}/api/db/${dbCurrentTable}/rows?${params}`);
+        if (!r.ok) throw new Error();
+        const d = await r.json();
+        dbPages = d.pages;
+        renderDbTable(d.rows, d.total, d.page, d.pages, Number(perPage));
+    } catch { toast('Erro ao carregar dados', 'error'); }
+}
+
+function renderDbTable(rows, total, page, pages, perPage) {
+    const tableEl = document.getElementById('dbTable');
+    const emptyEl = document.getElementById('dbEmptyState');
+    const pagEl   = document.getElementById('dbPagination');
+
+    if (!rows.length) {
+        tableEl.style.display = 'none';
+        emptyEl.style.display = '';
+        emptyEl.innerHTML = '<div class="ei">🗄️</div><div>Nenhum registro encontrado</div>';
+        pagEl.style.display = 'none';
+        return;
+    }
+
+    dbRowCache = {};
+    rows.forEach(r => { dbRowCache[r.id] = r; });
+
+    tableEl.style.display = '';
+    emptyEl.style.display = 'none';
+    pagEl.style.display   = 'flex';
+
+    const cols = Object.keys(rows[0]);
+
+    document.getElementById('dbThead').innerHTML =
+        '<tr>' +
+        cols.map(c => `<th>${c}</th>`).join('') +
+        '<th style="min-width:80px">Ações</th></tr>';
+
+    document.getElementById('dbTbody').innerHTML = rows.map(row => {
+        const id    = row.id;
+        const cells = cols.map(c => {
+            let v = row[c];
+            if (v === null || v === undefined) return '<td><span class="db-null">null</span></td>';
+            const s = String(v);
+            return `<td title="${s.replace(/"/g,'&quot;')}">${s.length > 38 ? s.substr(0,38) + '…' : s}</td>`;
+        }).join('');
+        return `<tr>${cells}<td>
+            <button class="btn btn-outline btn-sm" onclick="openDbEdit(${id})" title="Editar">✏️</button>
+            <button class="btn btn-sm" style="color:#ef4444;border-color:transparent" onclick="dbDeleteRow('${dbCurrentTable}',${id})" title="Excluir">🗑️</button>
+        </td></tr>`;
+    }).join('');
+
+    const from = (page - 1) * perPage + 1;
+    const to   = Math.min(page * perPage, total);
+    document.getElementById('dbPageInfo').textContent =
+        `${fmtNum(from)}–${fmtNum(to)} de ${fmtNum(total)} registros • Pág. ${page}/${pages}`;
+    document.getElementById('dbPrevBtn').disabled = page <= 1;
+    document.getElementById('dbNextBtn').disabled = page >= pages;
+}
+
+function dbChangePage(delta) {
+    const next = dbPage + delta;
+    if (next < 1 || next > dbPages) return;
+    dbPage = next;
+    dbLoadRows();
+}
+
+async function dbDeleteRow(table, id) {
+    if (!confirm(`Excluir registro #${id}?\nEsta ação não pode ser desfeita.`)) return;
+    try {
+        const r = await fetch(`${API}/api/db/${table}/${id}`, { method: 'DELETE' });
+        if (!r.ok) { toast('Erro ao excluir registro', 'error'); return; }
+        toast('Registro excluído', 'success');
+        loadDbStats();
+        dbLoadRows();
+    } catch { toast('Erro ao excluir registro', 'error'); }
+}
+
+async function dbClear(table) {
+    const labels = { faturamento:'Faturamento', volume:'Volume', meta_faturamento:'Meta de Faturamento' };
+    if (!confirm(`Limpar TODOS os registros de "${labels[table]}"?\n\nEsta ação é irreversível!`)) return;
+    try {
+        const r = await fetch(`${API}/api/db/${table}/clear`, { method: 'DELETE' });
+        if (!r.ok) { toast('Erro ao limpar', 'error'); return; }
+        const d = await r.json();
+        toast(`${fmtNum(d.deleted)} registros removidos de ${labels[table]}`, 'success');
+        loadDbStats();
+        if (dbCurrentTable === table) dbLoadRows();
+        loadAll();
+    } catch { toast('Erro ao limpar tabela', 'error'); }
+}
+
+function openDbEdit(id) {
+    const rowData = dbRowCache[id];
+    if (!rowData) { toast('Registro não encontrado no cache', 'error'); return; }
+    dbEditId    = id;
+    dbEditTable = dbCurrentTable;
+    document.getElementById('dbModalTitle').textContent = `Editar Registro #${id} — ${dbCurrentTable}`;
+
+    const fields = Object.entries(rowData)
+        .filter(([k]) => k !== 'id')
+        .map(([k, v]) => {
+            const isNum  = typeof v === 'number';
+            const isBool = typeof v === 'boolean';
+            if (isBool) {
+                return `<div class="db-form-field">
+                    <label>${k}</label>
+                    <input type="checkbox" name="${k}" ${v ? 'checked' : ''} />
+                </div>`;
+            }
+            const inp = isNum
+                ? `<input type="number" name="${k}" value="${v ?? ''}" step="any" />`
+                : `<input type="text" name="${k}" value="${(v==null?'':String(v)).replace(/"/g,'&quot;')}" />`;
+            return `<div class="db-form-field"><label>${k}</label>${inp}</div>`;
+        }).join('');
+
+    document.getElementById('dbModalBody').innerHTML = `<div class="db-form-grid">${fields}</div>`;
+    document.getElementById('dbModal').style.display = 'flex';
+}
+
+function closeDbModal() {
+    document.getElementById('dbModal').style.display = 'none';
+    dbEditId = null; dbEditTable = null;
+}
+
+async function saveDbRow() {
+    if (!dbEditId || !dbEditTable) return;
+    const inputs = document.querySelectorAll('#dbModalBody input');
+    const data   = {};
+    inputs.forEach(inp => {
+        if (inp.type === 'checkbox') {
+            data[inp.name] = inp.checked;
+        } else if (inp.type === 'number') {
+            data[inp.name] = inp.value === '' ? null : Number(inp.value);
+        } else {
+            data[inp.name] = inp.value === '' ? null : inp.value;
+        }
+    });
+    try {
+        const r = await fetch(`${API}/api/db/${dbEditTable}/${dbEditId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!r.ok) { toast('Erro ao salvar alterações', 'error'); return; }
+        toast('Registro atualizado com sucesso', 'success');
+        closeDbModal();
+        dbLoadRows();
+    } catch { toast('Erro ao salvar alterações', 'error'); }
+}
+
+// Wire search + per-page + modal backdrop after DOM ready
+window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('dbSearch').addEventListener(
+        'input', _dbDebounce(() => { dbPage = 1; dbLoadRows(); }, 400)
+    );
+    document.getElementById('dbPerPage').addEventListener('change', () => {
+        dbPage = 1; dbLoadRows();
+    });
+    document.getElementById('dbModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDbModal();
+    });
+});
+
+// ── LOAD ALL ──────────────────────────────────────────────────────
+async function loadAll() {
+    await loadFiltros();
+    await loadDashboard();
+    await loadMetas();
+}
+
+// ── MAP ───────────────────────────────────────────────────────────
+let map, clusterGroup, markersLayer, heatLayer;
+let allMarkers = [], heatmapActive = false, clusterEnabled = true;
+
+const CLASS_COLORS = {
+    AGUA:'#ff0000', AGUA_ESGOTO:'#008000', TEE:'#8b4513',
+    AGUA_TEE:'#ffa500', AGUA_ESGOTO_TEE:'#0000ff', GC:'#d4af37', OUTROS:'#808080'
+};
+
+function classifyPonto(tipo, isGrande) {
+    if (String(isGrande||'').toUpperCase() === 'SIM') return 'GC';
+    const t = String(tipo||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const agua=t.includes('AGUA'), esgoto=t.includes('ESGOTO'), tee=t.includes('T.E.E');
+    if (agua&&esgoto&&tee) return 'AGUA_ESGOTO_TEE';
+    if (agua&&esgoto)      return 'AGUA_ESGOTO';
+    if (agua&&tee)         return 'AGUA_TEE';
+    if (tee)               return 'TEE';
+    if (agua)              return 'AGUA';
+    return 'OUTROS';
+}
+
+function initMap() {
+    map = L.map('map', { center:[-15.78,-47.93], zoom:5 });
+    const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        { attribution:'© CARTO', subdomains:'abcd', maxZoom:20 });
+    const osm  = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution:'© OSM', maxZoom:20 });
+    dark.addTo(map);
+    L.control.layers({'Escuro':dark,'OpenStreetMap':osm},{},{position:'bottomright'}).addTo(map);
+    clusterGroup = L.markerClusterGroup({ chunkedLoading:true, maxClusterRadius:50 });
+    markersLayer = L.layerGroup();
+    map.addLayer(clusterGroup);
+    loadPontos();
+}
+
+async function loadPontos() {
+    if (!map) return;
+    const tipo  = document.getElementById('filtroTipo')?.value || '';
+    const limit = document.getElementById('maxPontos')?.value  || '30000';
+    const p = new URLSearchParams({ limit });
+    if (tipo) p.append('tipo_faturamento', tipo);
+    setLoading(true, 'Carregando pontos...');
+    try {
+        const res  = await fetch(`${API}/api/pontos?${p}`);
+        const data = await res.json();
+        renderMarkers(data.data || []);
+        document.getElementById('statusPontos').textContent = (data.data||[]).length.toLocaleString('pt-BR');
+    } catch { toast('Erro ao carregar pontos','error'); }
+    finally { setLoading(false); }
 }
 
 function renderMarkers(pontos) {
-    markerClusterGroup.clearLayers();
-    markersLayer.clearLayers();
-    allMarkers = [];
-
+    clusterGroup.clearLayers(); markersLayer.clearLayers(); allMarkers = [];
     pontos.forEach(p => {
         if (!p.lat || !p.lng) return;
-        const color = getDynamicColor(p.tipo_faturamento, p.is_grande);
-        const marker = createCircleMarker(p.lat, p.lng, color);
-        marker.bindPopup(buildPopup(p), { maxWidth: 280 });
-        allMarkers.push(marker);
+        const cls   = classifyPonto(p.tipo_faturamento, p.is_grande);
+        const color = CLASS_COLORS[cls] || '#808080';
+        const m = L.circleMarker([p.lat,p.lng],{
+            radius:7, fillColor:color, color:'rgba(255,255,255,0.4)',
+            weight:1.5, opacity:1, fillOpacity:0.85
+        });
+        m.bindPopup(`<div>
+            <div class="popup-row"><span class="k">Ligação</span><span class="v">${p.num_ligacao||'—'}</span></div>
+            <div class="popup-row"><span class="k">Cidade</span><span class="v">${p.cidade||'—'}</span></div>
+            <div class="popup-row"><span class="k">Macro</span><span class="v">${p.macro||'—'}</span></div>
+            <div class="popup-row"><span class="k">Faturamento</span><span class="v">${p.sum_valor!=null?fmtBrl(p.sum_valor):'—'}</span></div>
+        </div>`,{maxWidth:240});
+        allMarkers.push(m);
     });
-
-    if (clusterEnabled) {
-        markerClusterGroup.addLayers(allMarkers);
-    } else {
-        allMarkers.forEach(m => markersLayer.addLayer(m));
-    }
-
-    pontosAtivos = allMarkers.length;
-    document.getElementById('statusPontos').textContent = pontosAtivos.toLocaleString('pt-BR');
-}
-
-function buildPopup(p) {
-    const classe = classifyPonto(p.tipo_faturamento, p.is_grande);
-    const color  = getClassColor(classe);
-    const sumFmt = p.sum_valor != null
-        ? Number(p.sum_valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })
-        : '—';
-    const volFmt = p.vol_fat != null ? Number(p.vol_fat).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + ' m³' : '—';
-    return `<div class="popup-content">
-        <h4>💰 ${p.nom_cliente || 'Cliente'}</h4>
-        <div class="popup-row">
-            <span class="key">Tipo</span>
-            <span class="val"><span class="tipo-badge" style="background:${color}22;color:${color};border:1px solid ${color}">${p.tipo_faturamento || '—'}</span></span>
-        </div>
-        <div class="popup-row">
-            <span class="key">Classe</span>
-            <span class="val"><span class="tipo-badge" style="background:${color}33;color:${color};border:1px solid ${color};font-weight:700">${classe}</span></span>
-        </div>
-        <div class="popup-row"><span class="key">Nº Ligação</span><span class="val">${p.num_ligacao || '—'}</span></div>
-        <div class="popup-row"><span class="key">Cidade</span><span class="val">${p.cidade || '—'}</span></div>
-        <div class="popup-row"><span class="key">Macro</span><span class="val">${p.macro || '—'}</span></div>
-        <div class="popup-row"><span class="key">Micro</span><span class="val">${p.micro || '—'}</span></div>
-        <div class="popup-row"><span class="key">Referência</span><span class="val">${p.referencia || '—'}</span></div>
-        <div class="popup-row"><span class="key">Categoria</span><span class="val">${p.categoria || '—'}</span></div>
-        <div class="popup-row"><span class="key">Situação</span><span class="val">${p.sit_ligacao || '—'}</span></div>
-        <div class="popup-row" style="background:rgba(16,185,129,0.08);border-radius:4px;padding:4px 0">
-            <span class="key" style="color:#10b981;font-weight:600">Faturamento</span>
-            <span class="val" style="color:#10b981;font-weight:700">${sumFmt}</span>
-        </div>
-        <div class="popup-row"><span class="key">Vol. Fat.</span><span class="val">${volFmt}</span></div>
-        <div class="popup-row"><span class="key">Grande Cons.</span><span class="val">${p.is_grande || '—'}</span></div>
-        <div class="popup-row" style="border-top:1px solid #334155;margin-top:4px;padding-top:4px">
-            <span class="key">Coords</span>
-            <span class="val" style="font-size:10px">${Number(p.lat).toFixed(5)}, ${Number(p.lng).toFixed(5)}</span>
-        </div>
-    </div>`;
-}
-
-function updateStatusBar(visible, total) {
-    document.getElementById('statusPontos').textContent =
-        visible < total ? `${visible.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')}` : visible.toLocaleString('pt-BR');
-
-    const tipo   = document.getElementById('filtroTipo').value;
-    const cidade  = document.getElementById('filtroCidade').value;
-    const macro   = document.getElementById('filtroMacro').value;
-    const gc      = document.querySelector('input[name="gcFilter"]:checked')?.value || '';
-    const parts = [];
-    if (tipo)   parts.push(`Tipo: ${tipo}`);
-    if (cidade) parts.push(`Cidade: ${cidade}`);
-    if (macro)  parts.push(`Macro: ${macro}`);
-    if (gc)     parts.push(`GC: ${gc}`);
-    document.getElementById('statusFiltro').textContent = parts.length ? parts.join(' | ') : 'Nenhum';
-}
-
-// ── HEATMAP (baseado em sum_valor / R$) ───────────────────
-async function loadHeatmapIfActive() {
-    if (heatmapActive) await activateHeatmap();
+    if (clusterEnabled) clusterGroup.addLayers(allMarkers);
+    else allMarkers.forEach(m => markersLayer.addLayer(m));
 }
 
 async function activateHeatmap() {
-    setLoading(true, 'Carregando mapa de calor...');
+    if (!map) return;
+    setLoading(true,'Carregando mapa de calor...');
     try {
-        const heatParams = new URLSearchParams();
-        const hCidade = document.getElementById('heatmapCidade')?.value || '';
-        const hValMin = document.getElementById('heatmapValMin')?.value || '0';
-        if (hCidade) heatParams.append('cidade', hCidade);
-        if (Number(hValMin) > 0) heatParams.append('val_min', hValMin);
-
-        const res = await fetch(`${API}/api/heatmap?${heatParams}`);
-        const data = await res.json();
-        if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
-        if (data.length === 0) { toast('Nenhum ponto com faturamento acima do mínimo.', 'warning'); return; }
-
-        // Use log1p scale so outliers não apaguem pontos menores
-        // Threshold de R$ 500 para separar baixo/alto faturamento
-        const VAL_THRESHOLD = 500;
-        const maxLog = data.reduce((m, d) => Math.max(m, Math.log1p(d[2])), 0);
-        const logThreshold = Math.log1p(VAL_THRESHOLD) / (maxLog || 1);
-        const normalized = data.map(d => [d[0], d[1], Math.log1p(d[2]) / (maxLog || 1)]);
-
-        heatLayer = L.heatLayer(normalized, {
-            radius: 22, blur: 18, maxZoom: 16, minOpacity: 0.3,
-            gradient: {
-                0.0: '#0ea5e9',
-                [logThreshold * 0.8]: '#22c55e',
-                [logThreshold]: '#facc15',
-                [Math.min(logThreshold * 1.3, 0.90)]: '#f97316',
-                1.0: '#ef4444',
-            }
-        }).addTo(map);
-
-        if (hCidade) {
-            const latLngs = data.map(d => [d[0], d[1]]);
-            try { map.fitBounds(L.latLngBounds(latLngs).pad(0.1)); } catch {}
-        }
-
-        const filterInfo = [hCidade && `Cidade: ${hCidade}`, Number(hValMin) > 0 && `Val ≥ R$ ${Number(hValMin).toLocaleString('pt-BR')}`]
-            .filter(Boolean).join(' | ');
-        document.getElementById('statusHeatmap').textContent = filterInfo ? `Ativo (${filterInfo})` : 'Ativo';
+        const hc = document.getElementById('heatmapCidade')?.value||'';
+        const hv = document.getElementById('heatmapValMin')?.value||'0';
+        const hp = new URLSearchParams();
+        if (hc) hp.append('cidade',hc);
+        if (Number(hv)>0) hp.append('val_min',hv);
+        const data = await fetch(`${API}/api/heatmap?${hp}`).then(r=>r.json());
+        if (heatLayer) { map.removeLayer(heatLayer); heatLayer=null; }
+        if (!data.length) { toast('Nenhum ponto disponível.','warning'); return; }
+        const maxLog = data.reduce((m,d)=>Math.max(m,Math.log1p(d[2]||0)),0);
+        heatLayer = L.heatLayer(
+            data.map(d=>[d[0],d[1],Math.log1p(d[2]||0)/(maxLog||1)]),
+            {radius:22,blur:18,maxZoom:16,minOpacity:0.3,gradient:{0:'#0ea5e9',0.5:'#facc15',1:'#ef4444'}}
+        ).addTo(map);
+        document.getElementById('statusHeatmap').textContent='Ativo';
         document.getElementById('btnHeatmapToggle').classList.add('active');
-        toast(`Mapa de calor — ${data.length.toLocaleString('pt-BR')} pontos${filterInfo ? ` (${filterInfo})` : ''}`, 'success');
-    } catch (err) {
-        toast('Erro ao carregar mapa de calor', 'error');
-    } finally {
-        setLoading(false);
-    }
+    } catch { toast('Erro ao carregar calor','error'); }
+    finally { setLoading(false); }
 }
 
 function deactivateHeatmap() {
-    if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
-    document.getElementById('statusHeatmap').textContent = 'Inativo';
+    if (heatLayer&&map) { map.removeLayer(heatLayer); heatLayer=null; }
+    document.getElementById('statusHeatmap').textContent='Inativo';
     document.getElementById('btnHeatmapToggle').classList.remove('active');
 }
 
-// ── CONTROLS ──────────────────────────────────────────────
-document.getElementById('toggleHeatmap').addEventListener('change', async function () {
+// ── EVENT WIRING ──────────────────────────────────────────────────
+document.getElementById('btnAplicar').addEventListener('click', () => {
+    loadDashboard(); loadMetas();
+});
+document.getElementById('btnLimpar').addEventListener('click', () => {
+    ['filtroCidade','filtroMacro','filtroMicro','filtroClasse','filtroGrupo','filtroCodGrupo','filtroAgrupador']
+        .forEach(id => { const e=document.getElementById(id); if(e) e.value=''; });
+    loadDashboard(); loadMetas();
+});
+document.getElementById('btnResetAll').addEventListener('click', () => document.getElementById('btnLimpar').click());
+document.getElementById('btnRefresh').addEventListener('click', () => loadAll());
+document.getElementById('sidebarToggle').addEventListener('click', () =>
+    document.getElementById('sidebar').classList.toggle('collapsed'));
+
+document.getElementById('toggleHeatmap').addEventListener('change', async function() {
     heatmapActive = this.checked;
     document.getElementById('heatmapControls').style.display = heatmapActive ? '' : 'none';
-    if (heatmapActive) {
-        await activateHeatmap();
-    } else {
-        deactivateHeatmap();
-    }
+    if (heatmapActive) await activateHeatmap(); else deactivateHeatmap();
 });
-
-document.getElementById('btnAtualizarHeatmap')?.addEventListener('click', () => activateHeatmap());
-
-document.getElementById('heatmapValMin')?.addEventListener('input', function () {
-    document.getElementById('heatmapValMinVal').textContent = Number(this.value).toLocaleString('pt-BR');
-});
-
 document.getElementById('btnHeatmapToggle').addEventListener('click', async () => {
     heatmapActive = !heatmapActive;
     document.getElementById('toggleHeatmap').checked = heatmapActive;
     document.getElementById('heatmapControls').style.display = heatmapActive ? '' : 'none';
-    if (heatmapActive) {
-        await activateHeatmap();
-    } else {
-        deactivateHeatmap();
-    }
+    if (heatmapActive) await activateHeatmap(); else deactivateHeatmap();
+});
+document.getElementById('btnAtualizarHeatmap')?.addEventListener('click', () => activateHeatmap());
+document.getElementById('heatmapValMin')?.addEventListener('input', function() {
+    document.getElementById('heatmapValMinVal').textContent = Number(this.value).toLocaleString('pt-BR');
 });
 
-document.getElementById('togglePontos').addEventListener('change', function () {
-    if (this.checked) {
-        if (clusterEnabled) map.addLayer(markerClusterGroup);
-        else map.addLayer(markersLayer);
-    } else {
-        map.removeLayer(markerClusterGroup);
-        map.removeLayer(markersLayer);
-    }
+document.getElementById('togglePontos').addEventListener('change', function() {
+    if (!map) return;
+    if (this.checked) { if(clusterEnabled) map.addLayer(clusterGroup); else map.addLayer(markersLayer); }
+    else { map.removeLayer(clusterGroup); map.removeLayer(markersLayer); }
 });
-
-document.getElementById('toggleCluster').addEventListener('change', async function () {
+document.getElementById('toggleCluster').addEventListener('change', function() {
+    if (!map) return;
     clusterEnabled = this.checked;
-    markerClusterGroup.clearLayers();
-    markersLayer.clearLayers();
-    map.removeLayer(markerClusterGroup);
-    map.removeLayer(markersLayer);
-
-    if (clusterEnabled) {
-        markerClusterGroup.addLayers(allMarkers);
-        map.addLayer(markerClusterGroup);
-    } else {
-        allMarkers.forEach(m => markersLayer.addLayer(m));
-        map.addLayer(markersLayer);
-    }
+    clusterGroup.clearLayers(); markersLayer.clearLayers();
+    map.removeLayer(clusterGroup); map.removeLayer(markersLayer);
+    if (clusterEnabled) { clusterGroup.addLayers(allMarkers); map.addLayer(clusterGroup); }
+    else { allMarkers.forEach(m=>markersLayer.addLayer(m)); map.addLayer(markersLayer); }
 });
-
-document.getElementById('btnAplicarFiltros').addEventListener('click', () => loadPontos());
-document.getElementById('btnRefresh').addEventListener('click', () => loadAll());
-
-document.getElementById('btnResetFilters').addEventListener('click', () => {
-    document.getElementById('filtroTipo').value = '';
-    document.getElementById('filtroCidade').value = '';
-    document.getElementById('filtroMacro').value = '';
-    const gcDefault = document.querySelector('input[name="gcFilter"][value=""]');
-    if (gcDefault) gcDefault.checked = true;
-    const slider = document.getElementById('maxPontos');
-    if (slider) { slider.value = 30000; document.getElementById('maxPontosVal').textContent = '30.000'; }
-    loadPontos();
+document.getElementById('btnAplicarPontos').addEventListener('click', () => loadPontos());
+document.getElementById('btnFitBounds').addEventListener('click', () => {
+    if (!map||!allMarkers.length) { toast('Nenhum ponto no mapa','warning'); return; }
+    try { map.fitBounds(L.featureGroup(allMarkers).getBounds().pad(0.1)); } catch {}
 });
-
-document.getElementById('maxPontos')?.addEventListener('input', function () {
+document.getElementById('maxPontos')?.addEventListener('input', function() {
     document.getElementById('maxPontosVal').textContent = Number(this.value).toLocaleString('pt-BR');
 });
 
-document.getElementById('btnFitBounds').addEventListener('click', () => {
-    if (allMarkers.length === 0) { toast('Nenhum ponto carregado', 'warning'); return; }
-    const group = L.featureGroup(allMarkers);
-    map.fitBounds(group.getBounds().pad(0.1));
-});
-
-document.getElementById('sidebarToggle').addEventListener('click', () => {
-    document.getElementById('sidebar').classList.toggle('collapsed');
-    setTimeout(() => map.invalidateSize(), 320);
-});
-
-// ── INIT ──────────────────────────────────────────────────
-(async () => {
-    await loadAll();
-    if (allMarkers.length > 0) {
-        const group = L.featureGroup(allMarkers);
-        try { map.fitBounds(group.getBounds().pad(0.1)); } catch {}
-    }
-})();
+// ── INIT ──────────────────────────────────────────────────────────
+(async () => { await loadAll(); })();
 </script>
 </body>
 </html>
