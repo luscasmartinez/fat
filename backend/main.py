@@ -1070,6 +1070,59 @@ def get_metas(
     }
 
 
+# ── /api/metas/por-cod-grupo ──────────────────────────────────────────────────
+# Compara meta vs faturado agrupados por cod_grupo.
+# Retorna: cod_grupo, meta, faturado e % atingimento.
+
+@app.get("/api/metas/por-cod-grupo")
+def get_metas_por_cod_grupo(
+    db: Session = Depends(get_db),
+    cidade: Optional[str] = Query(None),
+    macro:  Optional[str] = Query(None),
+    micro:  Optional[str] = Query(None),
+):
+    _IN = "('DIRETAS \u00c1GUA','DIRETAS AGUA'," \
+          "'DIRETAS ESGOTO'," \
+          "'INDIRETAS \u00c1GUA','INDIRETAS AGUA'," \
+          "'INDIRETAS ESGOTO'," \
+          "'SERVI\u00c7O B\u00c1SICO','SERVICO BASICO')"
+
+    params: dict = {"cidade": cidade, "macro": macro, "micro": micro}
+
+    sql = text(f"""
+        SELECT
+            m.cod_grupo,
+            SUM(m.valor)                        AS meta,
+            COALESCE(MAX(f.faturado), 0)        AS faturado
+        FROM meta_faturamento m
+        LEFT JOIN (
+            SELECT cod_grupo, SUM(sum_valor) AS faturado
+            FROM faturamento
+            WHERE (is_grand_total IS NULL OR is_grand_total = 0)
+            GROUP BY cod_grupo
+        ) f ON m.cod_grupo = f.cod_grupo
+        WHERE m.cod_grupo IS NOT NULL
+          AND UPPER(TRIM(m.agrupador)) IN {_IN}
+          AND (:cidade IS NULL OR m.cidade = :cidade)
+          AND (:macro  IS NULL OR m.macro  = :macro)
+          AND (:micro  IS NULL OR m.micro  = :micro)
+        GROUP BY m.cod_grupo
+        ORDER BY m.cod_grupo
+    """)
+
+    rows = db.execute(sql, params).fetchall()
+    return [
+        {
+            "cod_grupo":       r.cod_grupo,
+            "meta":            round(float(r.meta or 0), 2),
+            "faturado":        round(float(r.faturado or 0), 2),
+            "pct_atingimento": round(float(r.faturado or 0) / float(r.meta) * 100, 2)
+                               if r.meta and float(r.meta) > 0 else 0.0,
+        }
+        for r in rows
+    ]
+
+
 # ── /api/db ────────────────────────────────────────────────────────────────────
 # Painel de administração do banco de dados: listar, editar, excluir, limpar.
 

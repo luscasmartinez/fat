@@ -620,6 +620,17 @@
 
                     </div><!-- /charts-grid -->
 
+                    <!-- Chart: Meta vs Faturado por Cod_grupo -->
+                    <div class="chart-card full" style="margin-top:16px">
+                        <div class="chart-header">
+                            <div class="chart-title">Meta vs Faturado por Cod. Grupo</div>
+                            <div class="chart-subtitle">Eixo esquerdo (R$): faturado (azul) e meta (teal) · Eixo direito (%): % atingimento (laranja tracejado)</div>
+                        </div>
+                        <div class="chart-wrap" style="min-height:280px">
+                            <canvas id="chartMetaCodGrupo"></canvas>
+                        </div>
+                    </div>
+
                     <!-- Ranking table -->
                     <div class="chart-card" style="margin-top:16px">
                         <div class="chart-header">
@@ -1155,6 +1166,117 @@ function makePctBarH(canvasId, labels, values) {
     });
 }
 
+// Dual Y-axis line chart: left=R$ (meta + faturado), right=% atingimento
+function makeDualLine(canvasId, labels, dataMeta, dataFat, dataPct) {
+    destroyChart(canvasId);
+    const ctx = document.getElementById(canvasId);
+    if (!ctx || !labels.length) return;
+    ctx.parentElement.style.minHeight = '280px';
+
+    charts[canvasId] = new Chart(ctx, {
+        data: {
+            labels,
+            datasets: [
+                {
+                    type: 'line',
+                    label: 'Faturado (R$)',
+                    data: dataFat,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.08)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    tension: 0.3,
+                    fill: false,
+                    yAxisID: 'y',
+                },
+                {
+                    type: 'line',
+                    label: 'Meta (R$)',
+                    data: dataMeta,
+                    borderColor: '#2dd4bf',
+                    backgroundColor: 'rgba(45,212,191,0.08)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    tension: 0.3,
+                    fill: false,
+                    yAxisID: 'y',
+                },
+                {
+                    type: 'line',
+                    label: '% Atingimento',
+                    data: dataPct,
+                    borderColor: '#f97316',
+                    backgroundColor: 'rgba(249,115,22,0.08)',
+                    borderWidth: 2,
+                    borderDash: [6, 4],
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    tension: 0.3,
+                    fill: false,
+                    yAxisID: 'y1',
+                },
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 16 }
+                },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    titleColor: '#e2e8f0',
+                    bodyColor: '#94a3b8',
+                    callbacks: {
+                        label: ctx => {
+                            if (ctx.datasetIndex === 2)
+                                return `  ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`;
+                            return `  ${ctx.dataset.label}: ${fmtBrl(ctx.parsed.y)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: '#1a2840' },
+                    ticks: { color: '#64748b', font: { size: 10 } },
+                    border: { color: '#334155' }
+                },
+                y: {
+                    position: 'left',
+                    grid: { color: '#1a2840' },
+                    border: { color: '#334155' },
+                    ticks: {
+                        color: '#64748b', font: { size: 10 },
+                        callback: v => {
+                            if (Math.abs(v) >= 1e6) return 'R$' + (v/1e6).toFixed(1) + 'M';
+                            if (Math.abs(v) >= 1e3) return 'R$' + (v/1e3).toFixed(0) + 'k';
+                            return 'R$' + v;
+                        }
+                    }
+                },
+                y1: {
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    border: { color: '#334155' },
+                    ticks: {
+                        color: '#f97316', font: { size: 10 },
+                        callback: v => v + '%'
+                    }
+                }
+            },
+            layout: { padding: { right: 6 } }
+        }
+    });
+}
+
 // ── DASHBOARD ─────────────────────────────────────────────────────
 async function loadDashboard() {
     const params = filterParams();
@@ -1234,6 +1356,21 @@ async function loadMetas() {
         // Chart 3: Top 15 maiores gaps (meta > realizado)
         const cidGap = [...(d.by_cidade || [])].sort((a,b) => b.gap - a.gap).slice(0, 15);
         makeBarH('chartMetaGap', cidGap.map(r => r.cidade), cidGap.map(r => r.gap || 0));
+
+        // Chart 4: Meta vs Faturado por Cod_grupo (dual-axis line)
+        try {
+            const rCg = await fetch(`${API}/api/metas/por-cod-grupo?${params}`);
+            if (rCg.ok) {
+                const cg = await rCg.json();
+                makeDualLine(
+                    'chartMetaCodGrupo',
+                    cg.map(r => String(r.cod_grupo)),
+                    cg.map(r => r.meta),
+                    cg.map(r => r.faturado),
+                    cg.map(r => r.pct_atingimento)
+                );
+            }
+        } catch(e) { console.error('cod_grupo chart error', e); }
 
         // Ranking table
         renderMetasTable(d.by_cidade || []);
