@@ -230,6 +230,17 @@
         .metas-table td { padding: 7px 10px; border-bottom: 1px solid #1a2537; color: var(--text); }
         .metas-table tr:hover td { background: rgba(255,255,255,.03); }
         .metas-table tr:last-child td { border-bottom: none; }
+        /* pagination */
+        .pg-toolbar { display:flex; align-items:center; justify-content:space-between; padding:6px 10px 8px; gap:12px; flex-wrap:wrap; }
+        .pg-info { font-size:11px; color:var(--muted); }
+        .pg-size-label { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+        .pg-size-label select { background:var(--card); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:11px; padding:2px 6px; }
+        .pg-bar { display:flex; align-items:center; justify-content:center; gap:3px; padding:8px 10px 4px; flex-wrap:wrap; }
+        .pg-btn { background:var(--card); border:1px solid var(--border); color:var(--text); border-radius:4px; padding:4px 9px; font-size:11px; cursor:pointer; transition:background .15s; }
+        .pg-btn:hover:not(:disabled) { background:rgba(255,255,255,.08); }
+        .pg-btn:disabled { opacity:.35; cursor:default; }
+        .pg-btn.pg-active { background:#3b82f6; border-color:#3b82f6; color:#fff; font-weight:700; }
+        .pg-ellipsis { font-size:12px; color:var(--muted); padding:0 2px; }
         .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
         .badge-green  { background: rgba(16,185,129,.15);  color: #34d399; }
         .badge-yellow { background: rgba(245,158,11,.15);  color: #fcd34d; }
@@ -1378,10 +1389,27 @@ async function loadMetas() {
     } catch(e) { console.error('metas error', e); }
 }
 
+let _metasTableRows = [];
+let _metasPage      = 1;
+let _metasPageSize  = 10;
+
 function renderMetasTable(rows) {
-    const sorted = [...rows].sort((a, b) => b.pct_atingimento - a.pct_atingimento);
+    _metasTableRows = [...rows].sort((a, b) => b.pct_atingimento - a.pct_atingimento);
+    _metasPage = 1;
+    _renderMetasPage();
+}
+
+function _renderMetasPage() {
+    const total    = _metasTableRows.length;
+    const pageSize = _metasPageSize === 'all' ? total : _metasPageSize;
+    const totalPgs = _metasPageSize === 'all' ? 1 : Math.ceil(total / pageSize);
+    _metasPage     = Math.min(_metasPage, totalPgs || 1);
+    const start    = (_metasPage - 1) * pageSize;
+    const slice    = _metasTableRows.slice(start, start + pageSize);
+
     let tbody = '';
-    sorted.forEach((r, i) => {
+    slice.forEach((r, i) => {
+        const rank  = start + i + 1;
         const pct   = r.pct_atingimento || 0;
         const badge = pct >= 100
             ? '<span class="badge badge-green">Acima</span>'
@@ -1390,7 +1418,7 @@ function renderMetasTable(rows) {
             : '<span class="badge badge-red">Abaixo</span>';
         const pctColor = pct >= 100 ? '#34d399' : pct >= 80 ? '#fcd34d' : '#f87171';
         tbody += `<tr>
-            <td>${i+1}</td>
+            <td>${rank}</td>
             <td>${r.cidade||'—'}</td>
             <td>${r.macro||'—'}</td>
             <td>${fmtBrl(r.meta)}</td>
@@ -1400,8 +1428,39 @@ function renderMetasTable(rows) {
             <td>${badge}</td>
         </tr>`;
     });
-    document.getElementById('metasTable').innerHTML =
-        `<table class="metas-table">
+
+    // pagination controls
+    const pageSizeOpts = [10, 20, 'all'].map(v =>
+        `<option value="${v}" ${_metasPageSize == v ? 'selected' : ''}>${v === 'all' ? 'Todos' : v}</option>`
+    ).join('');
+
+    let pageNums = '';
+    if (_metasPageSize !== 'all') {
+        const maxShow = 7;
+        let s = Math.max(1, _metasPage - Math.floor(maxShow/2));
+        let e = Math.min(totalPgs, s + maxShow - 1);
+        if (e - s + 1 < maxShow) s = Math.max(1, e - maxShow + 1);
+        if (s > 1)        pageNums += `<button class="pg-btn" onclick="_metasGoPage(1)">1</button>${s>2?'<span class="pg-ellipsis">…</span>':''}`;
+        for (let p = s; p <= e; p++)
+            pageNums += `<button class="pg-btn${p===_metasPage?' pg-active':''}" onclick="_metasGoPage(${p})">${p}</button>`;
+        if (e < totalPgs) pageNums += `${e<totalPgs-1?'<span class="pg-ellipsis">…</span>':''}<button class="pg-btn" onclick="_metasGoPage(${totalPgs})">${totalPgs}</button>`;
+    }
+
+    const paginationBar = _metasPageSize === 'all' ? '' : `
+        <div class="pg-bar">
+            <button class="pg-btn" onclick="_metasGoPage(${_metasPage-1})" ${_metasPage<=1?'disabled':''}>‹</button>
+            ${pageNums}
+            <button class="pg-btn" onclick="_metasGoPage(${_metasPage+1})" ${_metasPage>=totalPgs?'disabled':''}>›</button>
+        </div>`;
+
+    document.getElementById('metasTable').innerHTML = `
+        <div class="pg-toolbar">
+            <span class="pg-info">Exibindo ${start+1}–${Math.min(start+pageSize,total)} de <strong>${total}</strong> cidades</span>
+            <label class="pg-size-label">Linhas por página:
+                <select onchange="_metasChangeSize(this.value)">${pageSizeOpts}</select>
+            </label>
+        </div>
+        <table class="metas-table">
             <thead>
                 <tr>
                     <th>#</th><th>Cidade</th><th>Macro</th>
@@ -1410,7 +1469,22 @@ function renderMetasTable(rows) {
                 </tr>
             </thead>
             <tbody>${tbody}</tbody>
-        </table>`;
+        </table>
+        ${paginationBar}`;
+}
+
+function _metasGoPage(p) {
+    const total    = _metasTableRows.length;
+    const pageSize = _metasPageSize === 'all' ? total : _metasPageSize;
+    const totalPgs = Math.ceil(total / pageSize);
+    _metasPage = Math.max(1, Math.min(p, totalPgs));
+    _renderMetasPage();
+}
+
+function _metasChangeSize(val) {
+    _metasPageSize = val === 'all' ? 'all' : parseInt(val);
+    _metasPage = 1;
+    _renderMetasPage();
 }
 
 // ── DATABASE BROWSER ─────────────────────────────────────────────
