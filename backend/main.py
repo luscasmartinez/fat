@@ -894,6 +894,77 @@ def get_dashboard(
     }
 
 
+@app.get("/api/decomposicao-receita")
+def get_decomposicao_receita(
+    db: Session = Depends(get_db),
+    cidade: Optional[str] = Query(None),
+    macro: Optional[str] = Query(None),
+    micro: Optional[str] = Query(None),
+    classe_rubrica: Optional[str] = Query(None),
+    grupo_rubrica: Optional[str] = Query(None),
+    cod_grupo: Optional[int] = Query(None),
+    top_n_descricoes: int = Query(120, ge=20, le=500),
+):
+    """
+    Decomposicao hierarquica da receita:
+    TOTAL -> grupo_rubrica -> classe_rubrica -> descricao_rubrica.
+    """
+    from sqlalchemy import func as sqlfunc
+
+    base = db.query(Faturamento).filter(
+        (Faturamento.is_grand_total == False) | (Faturamento.is_grand_total == None)
+    )
+    if cidade:
+        base = base.filter(Faturamento.cidade == cidade)
+    if macro:
+        base = base.filter(Faturamento.macro == macro)
+    if micro:
+        base = base.filter(Faturamento.micro == micro)
+    if classe_rubrica:
+        base = base.filter(Faturamento.classe_rubrica == classe_rubrica)
+    if grupo_rubrica:
+        base = base.filter(Faturamento.grupo_rubrica == grupo_rubrica)
+    if cod_grupo is not None:
+        base = base.filter(Faturamento.cod_grupo == cod_grupo)
+
+    rows = (
+        base.with_entities(
+            Faturamento.grupo_rubrica.label("grupo_rubrica"),
+            Faturamento.classe_rubrica.label("classe_rubrica"),
+            Faturamento.descricao_rubrica.label("descricao_rubrica"),
+            sqlfunc.sum(Faturamento.sum_valor).label("valor"),
+        )
+        .group_by(
+            Faturamento.grupo_rubrica,
+            Faturamento.classe_rubrica,
+            Faturamento.descricao_rubrica,
+        )
+        .order_by(sqlfunc.sum(Faturamento.sum_valor).desc())
+        .limit(top_n_descricoes)
+        .all()
+    )
+
+    data = []
+    total = 0.0
+    for r in rows:
+        v = float(r.valor or 0.0)
+        total += v
+        data.append(
+            {
+                "grupo_rubrica": r.grupo_rubrica or "N/A",
+                "classe_rubrica": r.classe_rubrica or "N/A",
+                "descricao_rubrica": r.descricao_rubrica or "N/A",
+                "valor": round(v, 2),
+            }
+        )
+
+    return {
+        "total": round(total, 2),
+        "qtd_itens": len(data),
+        "data": data,
+    }
+
+
 # ── /api/metas ────────────────────────────────────────────────────────────────
 # Realizado vs Meta por cidade e por agrupador.
 # Anti-duplicidade: faturamento é pré-agregado por cidade (CTE) antes do JOIN,

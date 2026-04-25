@@ -218,6 +218,94 @@
         .chart-title { font-size: 13px; font-weight: 600; color: var(--text); }
         .chart-subtitle { font-size: 10px; color: var(--muted); margin-top: 2px; }
         .chart-wrap { position: relative; }
+        .decomp-wrap {
+            position: relative;
+            min-height: 220px;
+            border: 1px solid #223149;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #121f32 0%, #101a2b 100%);
+            padding: 12px;
+        }
+        .decomp-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .decomp-btn {
+            border: 1px solid #2b3f5e;
+            background: #16243a;
+            color: #cbd5e1;
+            border-radius: 7px;
+            padding: 4px 8px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .decomp-btn:hover { background: #1b2d47; border-color: #3f5a84; color: #e2e8f0; }
+        .decomp-tree { display: flex; flex-direction: column; gap: 6px; }
+        .decomp-node {
+            border-radius: 8px;
+            border: 1px solid transparent;
+            transition: background-color .2s ease;
+        }
+        .decomp-node[data-level="0"] { background: rgba(59,130,246,.09); border-color: rgba(96,165,250,.25); }
+        .decomp-node[data-level="1"] { background: rgba(45,212,191,.07); border-color: rgba(45,212,191,.2); }
+        .decomp-node[data-level="2"] { background: rgba(148,163,184,.08); border-color: rgba(148,163,184,.16); }
+        .decomp-node[data-level="3"] { background: rgba(148,163,184,.05); border-color: rgba(71,85,105,.25); }
+        .decomp-node-head {
+            display: grid;
+            grid-template-columns: 20px minmax(200px, 1fr) 220px 120px;
+            gap: 10px;
+            align-items: center;
+            padding: 8px 10px;
+        }
+        .decomp-toggle {
+            width: 18px; height: 18px; border: none; border-radius: 4px;
+            background: rgba(255,255,255,.08); color: #cbd5e1; cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 10px; transition: transform .2s ease, background-color .2s ease;
+        }
+        .decomp-toggle:hover { background: rgba(255,255,255,.16); }
+        .decomp-toggle.collapsed { transform: rotate(-90deg); }
+        .decomp-label { color: #e2e8f0; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .decomp-meta { color: #94a3b8; font-size: 10px; text-align: right; }
+        .decomp-bar-track {
+            height: 8px; border-radius: 999px; overflow: hidden;
+            background: rgba(100,116,139,.25); border: 1px solid rgba(148,163,184,.18);
+        }
+        .decomp-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #38bdf8 0%, #2563eb 100%);
+            width: 0;
+            transition: width .35s ease;
+        }
+        .decomp-node[data-level="1"] .decomp-bar-fill { background: linear-gradient(90deg, #2dd4bf 0%, #0ea5a4 100%); }
+        .decomp-node[data-level="2"] .decomp-bar-fill { background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%); }
+        .decomp-node[data-level="3"] .decomp-bar-fill { background: linear-gradient(90deg, #a5b4fc 0%, #818cf8 100%); }
+        .decomp-children {
+            overflow: hidden;
+            max-height: 1200px;
+            opacity: 1;
+            transform: translateY(0);
+            transition: max-height .35s ease, opacity .25s ease, transform .25s ease;
+            padding: 0 0 4px 0;
+        }
+        .decomp-children.collapsed {
+            max-height: 0;
+            opacity: 0;
+            transform: translateY(-4px);
+            padding: 0;
+        }
+        .decomp-empty {
+            min-height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--muted);
+            font-size: 12px;
+        }
 
         /* Empty state */
         .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 340px; color: var(--muted); font-size: 14px; }
@@ -496,6 +584,15 @@
                     </div>
 
                     <div class="charts-grid">
+                        <div class="chart-card full">
+                            <div class="chart-header">
+                                <div class="chart-title">Decomposição da Receita</div>
+                                <div class="chart-subtitle">Fluxo hierárquico: grupo_rubrica → classe_rubrica → descricao_rubrica (base de faturamento)</div>
+                            </div>
+                            <div id="chartDecomp" class="decomp-wrap">
+                                <div class="decomp-empty">Carregando decomposição...</div>
+                            </div>
+                        </div>
                         <div class="chart-card">
                             <div class="chart-header">
                                 <div class="chart-title">Por Classe de Rubrica</div>
@@ -1047,15 +1144,112 @@ async function loadFiltros() {
 
 // ── CHARTS ────────────────────────────────────────────────────────
 const PALETTE = [
-    '#10b981','#06b6d4','#6366f1','#f59e0b','#ef4444',
-    '#8b5cf6','#ec4899','#14b8a6','#f97316','#84cc16',
-    '#3b82f6','#a855f7','#22d3ee','#fb923c','#4ade80',
+    '#1B40AE','#2dd4bf','#1B40AE','#2dd4bf','#1B40AE',
+    '#2dd4bf','#1B40AE','#2dd4bf','#1B40AE','#2dd4bf',
+    '#1B40AE','#2dd4bf','#1B40AE','#2dd4bf','#1B40AE',
 ];
 
 const charts = {};
 
 function destroyChart(id) {
     if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function renderHierarquiaReceita(rows) {
+    const wrap = document.getElementById('chartDecomp');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+
+    if (!rows || !rows.length) {
+        wrap.innerHTML = '<div class="decomp-empty">Sem dados para a decomposição com os filtros atuais.</div>';
+        return;
+    }
+
+    const tree = { label: 'Receita Total', valor: 0, children: new Map(), level: 0 };
+    rows.forEach(r => {
+        const grupo = r.grupo_rubrica || 'N/A';
+        const classe = r.classe_rubrica || 'N/A';
+        const descricao = r.descricao_rubrica || 'N/A';
+        const valor = Number(r.valor || 0);
+        tree.valor += valor;
+        if (!tree.children.has(grupo)) tree.children.set(grupo, { label: grupo, valor: 0, children: new Map(), level: 1 });
+        const g = tree.children.get(grupo);
+        g.valor += valor;
+        if (!g.children.has(classe)) g.children.set(classe, { label: classe, valor: 0, children: new Map(), level: 2 });
+        const c = g.children.get(classe);
+        c.valor += valor;
+        if (!c.children.has(descricao)) c.children.set(descricao, { label: descricao, valor: 0, children: new Map(), level: 3 });
+        c.children.get(descricao).valor += valor;
+    });
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'decomp-toolbar';
+    toolbar.innerHTML = '<button class="decomp-btn" id="decompExpandAll">Expandir tudo</button><button class="decomp-btn" id="decompCollapseAll">Recolher tudo</button>';
+    wrap.appendChild(toolbar);
+
+    const treeEl = document.createElement('div');
+    treeEl.className = 'decomp-tree';
+    wrap.appendChild(treeEl);
+
+    const defaultExpandedByLevel = { 0: true, 1: true, 2: false };
+    const childContainers = [];
+
+    function sortedChildren(node) {
+        return Array.from(node.children.values()).sort((a, b) => b.valor - a.valor);
+    }
+
+    function renderNode(node, parentValue) {
+        const el = document.createElement('div');
+        el.className = 'decomp-node';
+        el.dataset.level = String(node.level);
+        const pct = parentValue > 0 ? (node.valor / parentValue) * 100 : 0;
+        const children = sortedChildren(node);
+        const hasChildren = children.length > 0;
+
+        const head = document.createElement('div');
+        head.className = 'decomp-node-head';
+        head.style.paddingLeft = `${10 + (node.level * 18)}px`;
+        head.innerHTML = `
+            <button class="decomp-toggle ${hasChildren ? '' : 'collapsed'}" ${hasChildren ? '' : 'disabled'}>${hasChildren ? '▾' : '•'}</button>
+            <div class="decomp-label" title="${node.label}">${node.label}</div>
+            <div class="decomp-bar-track"><div class="decomp-bar-fill" style="width:${Math.max(0.8, pct).toFixed(2)}%"></div></div>
+            <div class="decomp-meta">${fmtBrl(node.valor)} • ${pct.toFixed(1)}%</div>
+        `;
+        el.appendChild(head);
+
+        if (hasChildren) {
+            const childWrap = document.createElement('div');
+            childWrap.className = 'decomp-children';
+            const expanded = !!defaultExpandedByLevel[node.level];
+            if (!expanded) childWrap.classList.add('collapsed');
+            const toggle = head.querySelector('.decomp-toggle');
+            if (!expanded) toggle.classList.add('collapsed');
+            toggle.addEventListener('click', () => {
+                const isCollapsed = childWrap.classList.toggle('collapsed');
+                toggle.classList.toggle('collapsed', isCollapsed);
+            });
+            children.forEach(ch => childWrap.appendChild(renderNode(ch, node.valor)));
+            el.appendChild(childWrap);
+            childContainers.push({ childWrap, toggle });
+        }
+
+        return el;
+    }
+
+    treeEl.appendChild(renderNode(tree, tree.valor));
+
+    document.getElementById('decompExpandAll').addEventListener('click', () => {
+        childContainers.forEach(({ childWrap, toggle }) => {
+            childWrap.classList.remove('collapsed');
+            toggle.classList.remove('collapsed');
+        });
+    });
+    document.getElementById('decompCollapseAll').addEventListener('click', () => {
+        childContainers.forEach(({ childWrap, toggle }) => {
+            childWrap.classList.add('collapsed');
+            toggle.classList.add('collapsed');
+        });
+    });
 }
 
 // Horizontal bar — single dataset
@@ -1192,8 +1386,8 @@ function makeDualLine(canvasId, labels, dataMeta, dataFat, dataPct) {
                     type: 'line',
                     label: 'Faturado (R$)',
                     data: dataFat,
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59,130,246,0.08)',
+                    borderColor: '#1B40AE',
+                    backgroundColor: 'rgba(27,64,174,0.08)',
                     borderWidth: 2.5,
                     pointRadius: 4,
                     pointHoverRadius: 6,
@@ -1206,7 +1400,7 @@ function makeDualLine(canvasId, labels, dataMeta, dataFat, dataPct) {
                     label: 'Meta (R$)',
                     data: dataMeta,
                     borderColor: '#2dd4bf',
-                    backgroundColor: 'rgba(45,212,191,0.08)',
+                    backgroundColor: 'rgba(45,212,191,0.06)',
                     borderWidth: 2.5,
                     pointRadius: 4,
                     pointHoverRadius: 6,
@@ -1324,6 +1518,20 @@ async function loadDashboard() {
         makeBarH('chartMacro',    L(d.by_macro),          V(d.by_macro));
         makeBarH('chartMicro',    L(d.by_micro),          V(d.by_micro));
         makeBarH('chartCodGrupo', L(d.by_cod_grupo).map(String), V(d.by_cod_grupo));
+
+        try {
+            const qp = new URLSearchParams(params);
+            qp.set('top_n_descricoes', '500');
+            const rDecomp = await fetch(`${API}/api/decomposicao-receita?${qp.toString()}`);
+            if (rDecomp.ok) {
+                const decomp = await rDecomp.json();
+                renderHierarquiaReceita(decomp.data || []);
+            } else {
+                renderHierarquiaReceita([]);
+            }
+        } catch {
+            renderHierarquiaReceita([]);
+        }
     } catch(e) { console.error('dashboard error', e); }
 }
 
