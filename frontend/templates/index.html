@@ -228,9 +228,15 @@
         }
         .decomp-toolbar {
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
+            align-items: center;
             gap: 8px;
             margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .decomp-toolbar-info {
+            color: #94a3b8;
+            font-size: 10px;
         }
         .decomp-btn {
             border: 1px solid #2b3f5e;
@@ -243,61 +249,32 @@
             transition: all .2s;
         }
         .decomp-btn:hover { background: #1b2d47; border-color: #3f5a84; color: #e2e8f0; }
-        .decomp-tree { display: flex; flex-direction: column; gap: 6px; }
-        .decomp-node {
+        .decomp-actions { display: flex; gap: 8px; align-items: center; }
+        .decomp-tree-canvas {
+            width: 100%;
+            min-height: 520px;
+            max-height: 68vh;
+            overflow: auto;
+            border: 1px solid rgba(71,85,105,.35);
+            border-radius: 9px;
+            background: rgba(15,23,42,.45);
+        }
+        .decomp-tree-svg { display: block; min-width: 920px; }
+        .decomp-tooltip {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+            z-index: 5;
+            background: #0f172a;
+            border: 1px solid #334155;
             border-radius: 8px;
-            border: 1px solid transparent;
-            transition: background-color .2s ease;
+            padding: 7px 9px;
+            color: #e2e8f0;
+            font-size: 11px;
+            box-shadow: 0 8px 28px rgba(2, 6, 23, .55);
+            max-width: 290px;
         }
-        .decomp-node[data-level="0"] { background: rgba(59,130,246,.09); border-color: rgba(96,165,250,.25); }
-        .decomp-node[data-level="1"] { background: rgba(45,212,191,.07); border-color: rgba(45,212,191,.2); }
-        .decomp-node[data-level="2"] { background: rgba(148,163,184,.08); border-color: rgba(148,163,184,.16); }
-        .decomp-node[data-level="3"] { background: rgba(148,163,184,.05); border-color: rgba(71,85,105,.25); }
-        .decomp-node-head {
-            display: grid;
-            grid-template-columns: 20px minmax(200px, 1fr) 220px 120px;
-            gap: 10px;
-            align-items: center;
-            padding: 8px 10px;
-        }
-        .decomp-toggle {
-            width: 18px; height: 18px; border: none; border-radius: 4px;
-            background: rgba(255,255,255,.08); color: #cbd5e1; cursor: pointer;
-            display: inline-flex; align-items: center; justify-content: center;
-            font-size: 10px; transition: transform .2s ease, background-color .2s ease;
-        }
-        .decomp-toggle:hover { background: rgba(255,255,255,.16); }
-        .decomp-toggle.collapsed { transform: rotate(-90deg); }
-        .decomp-label { color: #e2e8f0; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .decomp-meta { color: #94a3b8; font-size: 10px; text-align: right; }
-        .decomp-bar-track {
-            height: 8px; border-radius: 999px; overflow: hidden;
-            background: rgba(100,116,139,.25); border: 1px solid rgba(148,163,184,.18);
-        }
-        .decomp-bar-fill {
-            height: 100%;
-            border-radius: 999px;
-            background: linear-gradient(90deg, #38bdf8 0%, #2563eb 100%);
-            width: 0;
-            transition: width .35s ease;
-        }
-        .decomp-node[data-level="1"] .decomp-bar-fill { background: linear-gradient(90deg, #2dd4bf 0%, #0ea5a4 100%); }
-        .decomp-node[data-level="2"] .decomp-bar-fill { background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%); }
-        .decomp-node[data-level="3"] .decomp-bar-fill { background: linear-gradient(90deg, #a5b4fc 0%, #818cf8 100%); }
-        .decomp-children {
-            overflow: hidden;
-            max-height: 1200px;
-            opacity: 1;
-            transform: translateY(0);
-            transition: max-height .35s ease, opacity .25s ease, transform .25s ease;
-            padding: 0 0 4px 0;
-        }
-        .decomp-children.collapsed {
-            max-height: 0;
-            opacity: 0;
-            transform: translateY(-4px);
-            padding: 0;
-        }
+        .decomp-tooltip .muted { color: #94a3b8; font-size: 10px; }
         .decomp-empty {
             min-height: 220px;
             display: flex;
@@ -928,6 +905,7 @@
 <script src="/static/leaflet.markercluster.js"></script>
 <script src="/static/leaflet-heat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 
 <script>
 'use strict';
@@ -1150,6 +1128,7 @@ const PALETTE = [
 ];
 
 const charts = {};
+const decompTreeState = { rows: [], collapsed: new Set(), positions: new Map(), userTouched: false };
 
 function destroyChart(id) {
     if (charts[id]) { charts[id].destroy(); delete charts[id]; }
@@ -1158,97 +1137,268 @@ function destroyChart(id) {
 function renderHierarquiaReceita(rows) {
     const wrap = document.getElementById('chartDecomp');
     if (!wrap) return;
+    decompTreeState.rows = rows || [];
     wrap.innerHTML = '';
 
-    if (!rows || !rows.length) {
+    if (!decompTreeState.rows.length) {
         wrap.innerHTML = '<div class="decomp-empty">Sem dados para a decomposição com os filtros atuais.</div>';
         return;
     }
 
-    const tree = { label: 'Receita Total', valor: 0, children: new Map(), level: 0 };
-    rows.forEach(r => {
+    const tree = { id: 'root', label: 'Receita Total', valor: 0, children: new Map(), level: 0 };
+    decompTreeState.rows.forEach(r => {
         const grupo = r.grupo_rubrica || 'N/A';
         const classe = r.classe_rubrica || 'N/A';
         const descricao = r.descricao_rubrica || 'N/A';
         const valor = Number(r.valor || 0);
         tree.valor += valor;
-        if (!tree.children.has(grupo)) tree.children.set(grupo, { label: grupo, valor: 0, children: new Map(), level: 1 });
+        const gId = `g|${grupo}`;
+        const cId = `c|${grupo}|${classe}`;
+        const dId = `d|${grupo}|${classe}|${descricao}`;
+        if (!tree.children.has(grupo)) tree.children.set(grupo, { id: gId, label: grupo, valor: 0, children: new Map(), level: 1 });
         const g = tree.children.get(grupo);
         g.valor += valor;
-        if (!g.children.has(classe)) g.children.set(classe, { label: classe, valor: 0, children: new Map(), level: 2 });
+        if (!g.children.has(classe)) g.children.set(classe, { id: cId, label: classe, valor: 0, children: new Map(), level: 2 });
         const c = g.children.get(classe);
         c.valor += valor;
-        if (!c.children.has(descricao)) c.children.set(descricao, { label: descricao, valor: 0, children: new Map(), level: 3 });
+        if (!c.children.has(descricao)) c.children.set(descricao, { id: dId, label: descricao, valor: 0, children: new Map(), level: 3 });
         c.children.get(descricao).valor += valor;
     });
 
     const toolbar = document.createElement('div');
     toolbar.className = 'decomp-toolbar';
-    toolbar.innerHTML = '<button class="decomp-btn" id="decompExpandAll">Expandir tudo</button><button class="decomp-btn" id="decompCollapseAll">Recolher tudo</button>';
+    toolbar.innerHTML = `
+        <div class="decomp-toolbar-info">Clique no nó para expandir/recolher o ramo</div>
+        <div class="decomp-actions">
+            <button class="decomp-btn" id="decompExpandAll">Expandir tudo</button>
+            <button class="decomp-btn" id="decompCollapseAll">Recolher tudo</button>
+        </div>`;
     wrap.appendChild(toolbar);
 
-    const treeEl = document.createElement('div');
-    treeEl.className = 'decomp-tree';
-    wrap.appendChild(treeEl);
+    const canvas = document.createElement('div');
+    canvas.className = 'decomp-tree-canvas';
+    canvas.id = 'decompTreeCanvas';
+    wrap.appendChild(canvas);
 
-    const defaultExpandedByLevel = { 0: true, 1: true, 2: false };
-    const childContainers = [];
+    const tooltip = document.createElement('div');
+    tooltip.className = 'decomp-tooltip';
+    tooltip.id = 'decompTooltip';
+    wrap.appendChild(tooltip);
 
-    function sortedChildren(node) {
-        return Array.from(node.children.values()).sort((a, b) => b.valor - a.valor);
+    function normalizeNode(node, parentId) {
+        const children = Array.from(node.children.values())
+            .sort((a, b) => b.valor - a.valor)
+            .map(ch => normalizeNode(ch, node.id || parentId));
+        return {
+            id: node.id || parentId,
+            label: node.label,
+            valor: node.valor,
+            level: node.level,
+            children,
+        };
     }
 
-    function renderNode(node, parentValue) {
-        const el = document.createElement('div');
-        el.className = 'decomp-node';
-        el.dataset.level = String(node.level);
-        const pct = parentValue > 0 ? (node.valor / parentValue) * 100 : 0;
-        const children = sortedChildren(node);
-        const hasChildren = children.length > 0;
+    function collapseByDefault(node) {
+        if (node.level >= 2 && node.children?.length) decompTreeState.collapsed.add(node.id);
+        (node.children || []).forEach(collapseByDefault);
+    }
 
-        const head = document.createElement('div');
-        head.className = 'decomp-node-head';
-        head.style.paddingLeft = `${10 + (node.level * 18)}px`;
-        head.innerHTML = `
-            <button class="decomp-toggle ${hasChildren ? '' : 'collapsed'}" ${hasChildren ? '' : 'disabled'}>${hasChildren ? '▾' : '•'}</button>
-            <div class="decomp-label" title="${node.label}">${node.label}</div>
-            <div class="decomp-bar-track"><div class="decomp-bar-fill" style="width:${Math.max(0.8, pct).toFixed(2)}%"></div></div>
-            <div class="decomp-meta">${fmtBrl(node.valor)} • ${pct.toFixed(1)}%</div>
-        `;
-        el.appendChild(head);
+    const treeData = normalizeNode(tree, 'root');
+    if (!decompTreeState.userTouched && !decompTreeState.collapsed.size) collapseByDefault(treeData);
 
-        if (hasChildren) {
-            const childWrap = document.createElement('div');
-            childWrap.className = 'decomp-children';
-            const expanded = !!defaultExpandedByLevel[node.level];
-            if (!expanded) childWrap.classList.add('collapsed');
-            const toggle = head.querySelector('.decomp-toggle');
-            if (!expanded) toggle.classList.add('collapsed');
-            toggle.addEventListener('click', () => {
-                const isCollapsed = childWrap.classList.toggle('collapsed');
-                toggle.classList.toggle('collapsed', isCollapsed);
+    function applyCollapse(node) {
+        node.children = node.children || [];
+        node._children = node.children;
+        if (decompTreeState.collapsed.has(node.id)) node.children = [];
+        else node.children = node._children.map(applyCollapse);
+        return node;
+    }
+
+    function fmtPct(v) { return `${(v || 0).toFixed(1)}%`; }
+
+    function renderTree() {
+        canvas.innerHTML = '';
+        const data = applyCollapse(structuredClone(treeData));
+        const root = d3.hierarchy(data, d => d.children);
+        const treeLayout = d3.tree().nodeSize([74, 320]);
+        treeLayout(root);
+
+        const nodes = root.descendants();
+        const links = root.links();
+        const minX = d3.min(nodes, d => d.x) || 0;
+        const maxX = d3.max(nodes, d => d.x) || 0;
+        const maxY = d3.max(nodes, d => d.y) || 0;
+        const svgWidth = Math.max(980, maxY + 370);
+        const svgHeight = Math.max(420, maxX - minX + 140);
+        const offsetY = 64 - minX;
+        const nodeW = 285;
+        const nodeH = 46;
+
+        const svg = d3.select(canvas).append('svg')
+            .attr('class', 'decomp-tree-svg')
+            .attr('width', svgWidth)
+            .attr('height', svgHeight);
+
+        const g = svg.append('g').attr('transform', `translate(36, ${offsetY})`);
+        const t = d3.transition().duration(280).ease(d3.easeCubicOut);
+
+        g.append('g')
+            .selectAll('path')
+            .data(links)
+            .join('path')
+            .attr('fill', 'none')
+            .attr('stroke', '#60759a')
+            .attr('stroke-opacity', 0.35)
+            .attr('stroke-width', 1.15)
+            .attr('d', d3.linkHorizontal().x(d => d.y).y(d => d.x))
+            .style('opacity', 0)
+            .transition(t)
+            .style('opacity', 1);
+
+        const node = g.append('g')
+            .selectAll('g')
+            .data(nodes, d => d.data.id)
+            .join('g')
+            .attr('transform', d => {
+                const prev = decompTreeState.positions.get(d.data.id);
+                return prev ? `translate(${prev.y}, ${prev.x})` : `translate(${d.y}, ${d.x})`;
+            })
+            .style('cursor', d => (d.data._children?.length ? 'pointer' : 'default'))
+            .on('click', (event, d) => {
+                if (!d.data._children?.length) return;
+                decompTreeState.userTouched = true;
+                if (decompTreeState.collapsed.has(d.data.id)) decompTreeState.collapsed.delete(d.data.id);
+                else decompTreeState.collapsed.add(d.data.id);
+                renderTree();
+            })
+            .on('mousemove', (event, d) => {
+                const pctTotal = tree.valor > 0 ? (d.data.valor / tree.valor) * 100 : 0;
+                tooltip.style.display = 'block';
+                tooltip.innerHTML = `
+                    <div><strong>${d.data.label}</strong></div>
+                    <div class="muted">Valor: ${fmtBrl(d.data.valor)}</div>
+                    <div class="muted">% do total: ${fmtPct(pctTotal)}</div>
+                `;
+                const rect = wrap.getBoundingClientRect();
+                tooltip.style.left = `${event.clientX - rect.left + 14}px`;
+                tooltip.style.top = `${event.clientY - rect.top + 14}px`;
+            })
+            .on('mouseleave', () => { tooltip.style.display = 'none'; });
+
+        node.transition(t).attr('transform', d => `translate(${d.y}, ${d.x})`);
+
+        node.append('rect')
+            .attr('x', 0)
+            .attr('y', -nodeH / 2)
+            .attr('width', nodeW)
+            .attr('height', nodeH)
+            .attr('rx', 8)
+            .attr('fill', d => {
+                if (d.depth === 0) return 'rgba(59,130,246,.16)';
+                if (d.depth === 1) return 'rgba(45,212,191,.12)';
+                if (d.depth === 2) return 'rgba(148,163,184,.12)';
+                return 'rgba(148,163,184,.08)';
+            })
+            .attr('stroke', d => {
+                const pct = tree.valor > 0 ? (d.data.valor / tree.valor) * 100 : 0;
+                if (pct >= 20) return '#93c5fd';
+                if (pct >= 10) return '#67e8f9';
+                return 'rgba(148,163,184,.45)';
+            })
+            .attr('stroke-width', d => (tree.valor > 0 && (d.data.valor / tree.valor) * 100 >= 20 ? 1.8 : 1));
+
+        node.append('text')
+            .attr('x', 12)
+            .attr('y', -7)
+            .attr('fill', '#e2e8f0')
+            .style('font-size', '11px')
+            .style('font-weight', 600)
+            .text(d => (d.data.label.length > 34 ? `${d.data.label.slice(0, 34)}...` : d.data.label));
+
+        node.append('text')
+            .attr('x', nodeW - 10)
+            .attr('y', -7)
+            .attr('text-anchor', 'end')
+            .attr('fill', '#9fb0c7')
+            .style('font-size', '10px')
+            .text(d => fmtBrl(d.data.valor));
+
+        node.append('rect')
+            .attr('x', 12)
+            .attr('y', 6)
+            .attr('width', nodeW - 24)
+            .attr('height', 8)
+            .attr('rx', 999)
+            .attr('fill', 'rgba(100,116,139,.25)')
+            .attr('stroke', 'rgba(148,163,184,.22)');
+
+        node.append('rect')
+            .attr('x', 12)
+            .attr('y', 6)
+            .attr('height', 8)
+            .attr('rx', 999)
+            .attr('fill', d => {
+                if (d.depth === 1) return 'url(#barLvl1)';
+                if (d.depth === 2) return 'url(#barLvl2)';
+                if (d.depth === 3) return 'url(#barLvl3)';
+                return 'url(#barLvl0)';
+            })
+            .attr('width', 0)
+            .transition(t)
+            .attr('width', d => {
+                const pct = tree.valor > 0 ? (d.data.valor / tree.valor) * 100 : 0;
+                return Math.max(2, ((nodeW - 24) * pct) / 100);
             });
-            children.forEach(ch => childWrap.appendChild(renderNode(ch, node.valor)));
-            el.appendChild(childWrap);
-            childContainers.push({ childWrap, toggle });
-        }
 
-        return el;
+        node.append('text')
+            .attr('x', nodeW - 10)
+            .attr('y', 22)
+            .attr('text-anchor', 'end')
+            .attr('fill', '#7f93ad')
+            .style('font-size', '10px')
+            .text(d => fmtPct(tree.valor > 0 ? (d.data.valor / tree.valor) * 100 : 0));
+
+        node.filter(d => d.data._children?.length)
+            .append('text')
+            .attr('x', -8)
+            .attr('y', 3)
+            .attr('fill', '#cbd5e1')
+            .style('font-size', '11px')
+            .style('font-weight', 700)
+            .text(d => (decompTreeState.collapsed.has(d.data.id) ? '▸' : '▾'));
+
+        const defs = svg.append('defs');
+        const mkGrad = (id, from, to) => {
+            const gr = defs.append('linearGradient').attr('id', id).attr('x1', '0%').attr('x2', '100%');
+            gr.append('stop').attr('offset', '0%').attr('stop-color', from);
+            gr.append('stop').attr('offset', '100%').attr('stop-color', to);
+        };
+        mkGrad('barLvl0', '#38bdf8', '#2563eb');
+        mkGrad('barLvl1', '#2dd4bf', '#0ea5a4');
+        mkGrad('barLvl2', '#60a5fa', '#3b82f6');
+        mkGrad('barLvl3', '#a5b4fc', '#818cf8');
+
+        nodes.forEach(d => decompTreeState.positions.set(d.data.id, { x: d.x, y: d.y }));
     }
 
-    treeEl.appendChild(renderNode(tree, tree.valor));
+    renderTree();
 
     document.getElementById('decompExpandAll').addEventListener('click', () => {
-        childContainers.forEach(({ childWrap, toggle }) => {
-            childWrap.classList.remove('collapsed');
-            toggle.classList.remove('collapsed');
-        });
+        decompTreeState.userTouched = true;
+        decompTreeState.collapsed.clear();
+        renderHierarquiaReceita(decompTreeState.rows);
     });
     document.getElementById('decompCollapseAll').addEventListener('click', () => {
-        childContainers.forEach(({ childWrap, toggle }) => {
-            childWrap.classList.add('collapsed');
-            toggle.classList.add('collapsed');
-        });
+        decompTreeState.userTouched = true;
+        decompTreeState.collapsed = new Set();
+        const seed = structuredClone(treeData);
+        const stack = [seed];
+        while (stack.length) {
+            const n = stack.pop();
+            if (n.level >= 1 && n.children?.length) decompTreeState.collapsed.add(n.id);
+            (n.children || []).forEach(ch => stack.push(ch));
+        }
+        renderHierarquiaReceita(decompTreeState.rows);
     });
 }
 
@@ -1525,6 +1675,9 @@ async function loadDashboard() {
             const rDecomp = await fetch(`${API}/api/decomposicao-receita?${qp.toString()}`);
             if (rDecomp.ok) {
                 const decomp = await rDecomp.json();
+                decompTreeState.collapsed = new Set();
+                decompTreeState.positions = new Map();
+                decompTreeState.userTouched = false;
                 renderHierarquiaReceita(decomp.data || []);
             } else {
                 renderHierarquiaReceita([]);
