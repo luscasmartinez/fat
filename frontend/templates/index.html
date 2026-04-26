@@ -1357,6 +1357,16 @@ function renderHierarquiaReceita(rows) {
         const g = svg.append('g').attr('transform', `translate(36, ${offsetY})`);
         const t = d3.transition().duration(280).ease(d3.easeCubicOut);
 
+        const linkPath = d => {
+            const sx = d.source.y + nodeW;
+            const sy = d.source.x;
+            const tx = d.target.y;
+            const ty = d.target.x;
+            const cx1 = sx + (tx - sx) * 0.42;
+            const cx2 = sx + (tx - sx) * 0.58;
+            return `M${sx},${sy} C${cx1},${sy} ${cx2},${ty} ${tx},${ty}`;
+        };
+
         g.append('g')
             .selectAll('path')
             .data(links)
@@ -1365,7 +1375,7 @@ function renderHierarquiaReceita(rows) {
             .attr('stroke', '#60759a')
             .attr('stroke-opacity', 0.35)
             .attr('stroke-width', 1.15)
-            .attr('d', d3.linkHorizontal().x(d => d.y).y(d => d.x))
+            .attr('d', linkPath)
             .style('opacity', 0)
             .transition(t)
             .style('opacity', 1);
