@@ -218,6 +218,49 @@
         .chart-title { font-size: 13px; font-weight: 600; color: var(--text); }
         .chart-subtitle { font-size: 10px; color: var(--muted); margin-top: 2px; }
         .chart-wrap { position: relative; }
+        .comp-controls {
+            display: grid;
+            grid-template-columns: repeat(8, minmax(110px, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .cmp-cod-multi {
+            min-height: 92px;
+        }
+        .comp-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+        }
+        .comp-kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .comp-kpi {
+            background: #162238;
+            border: 1px solid #2c3f5f;
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        .comp-kpi .lbl { color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+        .comp-kpi .val { color: #e2e8f0; font-size: 18px; font-weight: 700; margin-top: 4px; }
+        .comp-kpi .sub { color: #7f93ad; font-size: 10px; margin-top: 2px; }
+        .comp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .comp-table th { color: #94a3b8; text-align: left; font-size: 10px; padding: 7px 10px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .4px; }
+        .comp-table td { color: #e2e8f0; padding: 8px 10px; border-bottom: 1px solid #1f2c43; }
+        .comp-table tr:hover td { background: rgba(255,255,255,.03); }
+        .comp-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        .comp-pill.ok { color: #34d399; background: rgba(16,185,129,.14); }
+        .comp-pill.bad { color: #f87171; background: rgba(239,68,68,.14); }
         .decomp-wrap {
             position: relative;
             min-height: 220px;
@@ -403,6 +446,8 @@
         @media (max-width: 960px) {
             .kpi-row { grid-template-columns: 1fr 1fr; }
             .charts-grid { grid-template-columns: 1fr; }
+            .comp-controls { grid-template-columns: 1fr 1fr; }
+            .comp-kpi-row { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -422,6 +467,7 @@
     <div class="tab-nav">
         <button class="tab-btn active" id="tabDashBtn"  onclick="switchTab('dash')">📊 Dashboard</button>
         <button class="tab-btn"        id="tabMetasBtn" onclick="switchTab('metas')">📈 Metas</button>
+        <button class="tab-btn"        id="tabCompBtn"  onclick="switchTab('comp')">⚖️ Comparativo</button>
         <button class="tab-btn"        id="tabMapBtn"   onclick="switchTab('map')">🗺️ Mapa</button>
         <button class="tab-btn"        id="tabDbBtn"    onclick="switchTab('db')">🗄️ Banco</button>
     </div>
@@ -729,6 +775,73 @@
             </div><!-- /dash-scroll -->
         </div><!-- /panelMetas -->
 
+        <!-- ── COMPARATIVO TAB ───────────────────────────────────── -->
+        <div class="tab-panel" id="panelComp">
+            <div class="dash-scroll">
+                <div class="comp-card" style="margin-bottom:14px">
+                    <div class="chart-header" style="margin-bottom:10px">
+                        <div class="chart-title">Comparativo Faturamento x Meta</div>
+                        <div class="chart-subtitle">Análise gerencial de atingimento por regra de negócio e por cod_grupo</div>
+                    </div>
+
+                    <div class="comp-controls">
+                        <div class="filter-group"><label>Cidade</label><select id="cmpCidade"><option value="">Todas</option></select></div>
+                        <div class="filter-group"><label>Macro</label><select id="cmpMacro"><option value="">Todas</option></select></div>
+                        <div class="filter-group"><label>Micro</label><select id="cmpMicro"><option value="">Todas</option></select></div>
+                        <div class="filter-group">
+                            <label>Visão</label>
+                            <select id="cmpModo">
+                                <option value="consolidado">Geral consolidada</option>
+                                <option value="cod_grupo">Segmentada por COD_GRUPO</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Ordenar por</label>
+                            <select id="cmpOrdenar">
+                                <option value="desvio" selected>Maior desvio</option>
+                                <option value="faturamento">Maior faturamento</option>
+                                <option value="pct">% atingimento</option>
+                            </select>
+                        </div>
+                        <div class="filter-group" style="grid-column: span 2">
+                            <label>COD_GRUPO (multi seleção)</label>
+                            <select id="cmpCodGrupo" class="cmp-cod-multi" multiple></select>
+                        </div>
+                        <div class="filter-group"><label>Top COD_GRUPO</label><select id="cmpTopN"><option>10</option><option selected>25</option><option>40</option><option>60</option></select></div>
+                        <div class="filter-group" style="display:flex;align-items:flex-end;gap:6px">
+                            <button class="btn btn-primary btn-sm" id="cmpAplicar" style="width:100%">Aplicar</button>
+                            <button class="btn btn-outline btn-sm" id="cmpLimpar" style="width:100%">Limpar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="comp-kpi-row">
+                    <div class="comp-kpi"><div class="lbl">Realizado Total</div><div class="val" id="cmpKpiReal">—</div><div class="sub">faturamento consolidado</div></div>
+                    <div class="comp-kpi"><div class="lbl">Meta Total</div><div class="val" id="cmpKpiMeta">—</div><div class="sub">meta correspondente</div></div>
+                    <div class="comp-kpi"><div class="lbl">% Atingimento</div><div class="val" id="cmpKpiPct">—</div><div class="sub">realizado / meta</div></div>
+                    <div class="comp-kpi"><div class="lbl">Desvio</div><div class="val" id="cmpKpiDesv">—</div><div class="sub" id="cmpKpiDesvSub">meta - realizado</div></div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title" id="cmpChartTitle">Realizado vs Meta</div>
+                        <div class="chart-subtitle">Barras comparativas com destaque de atingimento e desvios</div>
+                    </div>
+                    <div class="chart-wrap" style="min-height:260px">
+                        <canvas id="chartComparativo"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card" style="margin-top:14px">
+                    <div class="chart-header">
+                        <div class="chart-title">Ranking de Desvios</div>
+                        <div class="chart-subtitle">Maiores diferenças entre realizado e meta</div>
+                    </div>
+                    <div id="cmpTableWrap" style="overflow:auto"></div>
+                </div>
+            </div>
+        </div><!-- /panelComp -->
+
         <!-- ── MAP TAB ───────────────────────────────────────────── -->
         <div class="tab-panel" id="panelMap">
             <div class="map-layout">
@@ -940,6 +1053,7 @@ let mapReady = false;
 const TAB_MAP = {
     dash:  { panel: 'panelDash',  btn: 'tabDashBtn'  },
     metas: { panel: 'panelMetas', btn: 'tabMetasBtn' },
+    comp:  { panel: 'panelComp',  btn: 'tabCompBtn'  },
     map:   { panel: 'panelMap',   btn: 'tabMapBtn'   },
     db:    { panel: 'panelDB',    btn: 'tabDbBtn'    },
 };
@@ -957,6 +1071,7 @@ function switchTab(tab) {
         else setTimeout(() => map && map.invalidateSize(), 120);
     }
     if (tab === 'metas') loadMetas();
+    if (tab === 'comp')  loadComparativo(true);
     if (tab === 'db')    { loadDbStats(); dbLoadRows(); }
 }
 
@@ -1750,6 +1865,292 @@ async function loadMetas() {
     } catch(e) { console.error('metas error', e); }
 }
 
+// ── COMPARATIVO ───────────────────────────────────────────────────
+let _cmpLoadingFilters = false;
+const cmpLabels = {
+    diretas_agua: 'Diretas Água',
+    servico_basico: 'Serviço Básico',
+    diretas_esgoto: 'Diretas Esgoto',
+    indiretas_agua: 'Indiretas Água',
+    indiretas_esgoto: 'Indiretas Esgoto',
+};
+
+function getCmpFilters() {
+    const codSel = document.getElementById('cmpCodGrupo');
+    const cods = codSel ? Array.from(codSel.selectedOptions).map(o => o.value).filter(Boolean) : [];
+    return {
+        cidade: document.getElementById('cmpCidade')?.value || '',
+        macro: document.getElementById('cmpMacro')?.value || '',
+        micro: document.getElementById('cmpMicro')?.value || '',
+        modo: document.getElementById('cmpModo')?.value || 'consolidado',
+        top_n_cod_grupo: document.getElementById('cmpTopN')?.value || '25',
+        ordenar_por: document.getElementById('cmpOrdenar')?.value || 'desvio',
+        cod_grupos: cods,
+    };
+}
+
+function cmpParams() {
+    const f = getCmpFilters();
+    const p = new URLSearchParams();
+    if (f.cidade) p.set('cidade', f.cidade);
+    if (f.macro) p.set('macro', f.macro);
+    if (f.micro) p.set('micro', f.micro);
+    p.set('modo', f.modo);
+    p.set('top_n_cod_grupo', f.top_n_cod_grupo);
+    p.set('ordenar_por', f.ordenar_por);
+    (f.cod_grupos || []).forEach(c => p.append('cod_grupos', c));
+    return p;
+}
+
+function fillSelectDynamic(id, options, keepValue = true) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">Todas</option>';
+    (options || []).forEach(v => {
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = v;
+        sel.appendChild(o);
+    });
+    if (keepValue && prev && (options || []).includes(prev)) sel.value = prev;
+}
+
+function fillMultiSelectDynamic(id, options) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = new Set(Array.from(sel.selectedOptions).map(o => o.value));
+    sel.innerHTML = '';
+    (options || []).forEach(v => {
+        const o = document.createElement('option');
+        o.value = String(v);
+        o.textContent = String(v);
+        if (prev.has(String(v))) o.selected = true;
+        sel.appendChild(o);
+    });
+}
+
+async function loadComparativoFiltros() {
+    if (_cmpLoadingFilters) return;
+    _cmpLoadingFilters = true;
+    try {
+        const base = getCmpFilters();
+        const p = new URLSearchParams();
+        if (base.cidade) p.set('cidade', base.cidade);
+        if (base.macro) p.set('macro', base.macro);
+        if (base.micro) p.set('micro', base.micro);
+        (base.cod_grupos || []).forEach(c => p.append('cod_grupos', c));
+        const r = await fetch(`${API}/api/comparativo/filtros?${p.toString()}`);
+        if (!r.ok) return;
+        const d = await r.json();
+        fillSelectDynamic('cmpCidade', d.cidades || []);
+        fillSelectDynamic('cmpMacro', d.macros || []);
+        fillSelectDynamic('cmpMicro', d.micros || []);
+        fillMultiSelectDynamic('cmpCodGrupo', (d.cod_grupos || []).map(String));
+    } catch (e) {
+        console.error('comparativo filtros error', e);
+    } finally {
+        _cmpLoadingFilters = false;
+    }
+}
+
+function makeComparativoChart(labels, realizado, meta, isCodMode = false) {
+    destroyChart('chartComparativo');
+    const ctx = document.getElementById('chartComparativo');
+    if (!ctx || !labels.length) return;
+
+    ctx.parentElement.style.minHeight = Math.max(240, labels.length * 28 + 60) + 'px';
+    const statusColors = labels.map((_, i) => {
+        const pct = meta[i] > 0 ? (realizado[i] / meta[i]) * 100 : 0;
+        return pct >= 100 ? '#10b981cc' : '#ef4444cc';
+    });
+
+    charts['chartComparativo'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Meta (R$)',
+                    data: meta,
+                    backgroundColor: '#334155aa',
+                    borderColor: '#475569',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    borderSkipped: false,
+                },
+                {
+                    label: 'Realizado (R$)',
+                    data: realizado,
+                    backgroundColor: statusColors,
+                    borderColor: statusColors.map(c => c.replace('cc', '')),
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    borderSkipped: false,
+                }
+            ]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 450, easing: 'easeOutCubic' },
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: { color: '#94a3b8', font: { size: 11 } }
+                },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    titleColor: '#e2e8f0',
+                    bodyColor: '#94a3b8',
+                    callbacks: {
+                        afterBody: (items) => {
+                            const i = items?.[0]?.dataIndex ?? 0;
+                            const rv = Number(realizado[i] || 0);
+                            const mv = Number(meta[i] || 0);
+                            const pct = mv > 0 ? (rv / mv) * 100 : 0;
+                            return [`Atingimento: ${pct.toFixed(1)}%`, `Desvio: ${fmtBrl(rv - mv)}`];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: '#1a2840' },
+                    border: { color: '#334155' },
+                    ticks: {
+                        color: '#64748b',
+                        font: { size: 10 },
+                        callback: v => Math.abs(v) >= 1e6 ? `R$ ${(v / 1e6).toFixed(1)}M` : (Math.abs(v) >= 1e3 ? `R$ ${(v / 1e3).toFixed(0)}k` : `R$ ${v}`)
+                    }
+                },
+                y: {
+                    grid: { display: false },
+                    border: { color: '#334155' },
+                    ticks: {
+                        color: '#94a3b8',
+                        font: { size: 10 },
+                        callback: function(v) {
+                            const lbl = this.getLabelForValue(v);
+                            const max = isCodMode ? 24 : 34;
+                            return lbl.length > max ? `${lbl.slice(0, max)}…` : lbl;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderCmpTable(rows, isCodMode = false) {
+    const host = document.getElementById('cmpTableWrap');
+    if (!host) return;
+    if (!rows || !rows.length) {
+        host.innerHTML = '<div class="decomp-empty" style="min-height:120px">Sem dados para os filtros selecionados.</div>';
+        return;
+    }
+    if (!isCodMode) {
+        host.innerHTML = `
+            <table class="comp-table">
+                <thead><tr><th>Indicador</th><th>Realizado</th><th>Meta</th><th>% Atingimento</th><th>Desvio</th><th>Status</th></tr></thead>
+                <tbody>
+                    ${rows.map(r => `
+                        <tr>
+                            <td>${r.label}</td>
+                            <td>${fmtBrl(r.realizado)}</td>
+                            <td>${fmtBrl(r.meta)}</td>
+                            <td style="color:${(r.pct_atingimento || 0) >= 100 ? '#34d399' : '#f87171'};font-weight:700">${(r.pct_atingimento || 0).toFixed(1)}%</td>
+                            <td>${fmtBrl(r.desvio)}</td>
+                            <td><span class="comp-pill ${(r.atingiu ? 'ok' : 'bad')}">${r.atingiu ? 'Atingiu' : 'Abaixo'}</span></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+        return;
+    }
+    host.innerHTML = `
+        <table class="comp-table">
+            <thead><tr><th>COD_GRUPO</th><th>Realizado</th><th>Meta</th><th>% Atingimento</th><th>Desvio (R$)</th><th>Desvio (%)</th><th>Status</th></tr></thead>
+            <tbody>
+                ${rows.map(r => {
+                    const pct = Number(r.pct_atingimento_total || 0);
+                    const ok = pct >= 100;
+                    const varPct = Number(r.meta_total || 0) > 0 ? ((Number(r.realizado_total || 0) - Number(r.meta_total || 0)) / Number(r.meta_total || 0)) * 100 : 0;
+                    return `
+                        <tr>
+                            <td>${r.cod_grupo == null ? 'N/A' : r.cod_grupo}</td>
+                            <td>${fmtBrl(r.realizado_total)}</td>
+                            <td>${fmtBrl(r.meta_total)}</td>
+                            <td style="color:${ok ? '#34d399' : '#f87171'};font-weight:700">${pct.toFixed(1)}%</td>
+                            <td>${fmtBrl(r.desvio_total)}</td>
+                            <td style="color:${varPct >= 0 ? '#34d399' : '#f87171'};font-weight:700">${varPct.toFixed(1)}%</td>
+                            <td><span class="comp-pill ${ok ? 'ok' : 'bad'}">${ok ? 'Atingiu' : 'Abaixo'}</span></td>
+                        </tr>`;
+                }).join('')}
+            </tbody>
+        </table>`;
+}
+
+async function loadComparativo(forceFilters = false) {
+    if (forceFilters) await loadComparativoFiltros();
+    const p = cmpParams();
+    try {
+        const r = await fetch(`${API}/api/comparativo?${p.toString()}`);
+        if (!r.ok) return;
+        const d = await r.json();
+
+        const modo = d.modo || 'consolidado';
+        const codMode = modo === 'cod_grupo';
+        document.getElementById('cmpChartTitle').textContent = codMode ? 'Comparação Segmentada por COD_GRUPO' : 'Comparação Consolidada por Regra de Negócio';
+
+        let labels = [];
+        let real = [];
+        let meta = [];
+        let tableRows = [];
+        let kpi = { realizado_total: 0, meta_total: 0, desvio_total: 0, pct_atingimento_total: null };
+
+        if (codMode) {
+            tableRows = d.rows || [];
+            const topRows = [...tableRows].slice(0, 20);
+            labels = topRows.map(r => `COD ${r.cod_grupo ?? 'N/A'}`);
+            real = topRows.map(r => r.realizado_total || 0);
+            meta = topRows.map(r => r.meta_total || 0);
+            const rtot = tableRows.reduce((a, x) => a + Number(x.realizado_total || 0), 0);
+            const mtot = tableRows.reduce((a, x) => a + Number(x.meta_total || 0), 0);
+            kpi = {
+                realizado_total: rtot,
+                meta_total: mtot,
+                desvio_total: rtot - mtot,
+                pct_atingimento_total: mtot > 0 ? (rtot / mtot) * 100 : null,
+            };
+        } else {
+            tableRows = d.items || [];
+            labels = tableRows.map(x => cmpLabels[x.id] || x.label);
+            real = tableRows.map(x => x.realizado || 0);
+            meta = tableRows.map(x => x.meta || 0);
+            kpi = d.kpis || kpi;
+        }
+
+        makeComparativoChart(labels, real, meta, codMode);
+        renderCmpTable(tableRows, codMode);
+
+        document.getElementById('cmpKpiReal').textContent = fmtBrl(kpi.realizado_total);
+        document.getElementById('cmpKpiMeta').textContent = fmtBrl(kpi.meta_total);
+        const pctEl = document.getElementById('cmpKpiPct');
+        const pct = kpi.pct_atingimento_total;
+        pctEl.textContent = pct != null ? `${pct.toFixed(1)}%` : '—';
+        pctEl.style.color = pct != null && pct >= 100 ? '#34d399' : '#f87171';
+        document.getElementById('cmpKpiDesv').textContent = fmtBrl(kpi.desvio_total);
+        document.getElementById('cmpKpiDesv').style.color = Number(kpi.desvio_total || 0) >= 0 ? '#34d399' : '#f87171';
+        document.getElementById('cmpKpiDesvSub').textContent = Number(kpi.desvio_total || 0) >= 0 ? 'acima da meta' : 'abaixo da meta';
+    } catch (e) {
+        console.error('comparativo error', e);
+    }
+}
+
 let _metasTableRows = [];
 let _metasPage      = 1;
 let _metasPageSize  = 10;
@@ -2053,6 +2454,9 @@ async function loadAll() {
     await loadFiltros();
     await loadDashboard();
     await loadMetas();
+    if (document.getElementById('panelComp')?.classList.contains('active')) {
+        await loadComparativo(true);
+    }
 }
 
 // ── MAP ───────────────────────────────────────────────────────────
@@ -2207,6 +2611,30 @@ document.getElementById('btnFitBounds').addEventListener('click', () => {
 });
 document.getElementById('maxPontos')?.addEventListener('input', function() {
     document.getElementById('maxPontosVal').textContent = Number(this.value).toLocaleString('pt-BR');
+});
+
+// Comparativo
+['cmpCidade','cmpMacro','cmpMicro'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', async () => {
+        await loadComparativoFiltros();
+    });
+});
+document.getElementById('cmpAplicar')?.addEventListener('click', () => loadComparativo(false));
+document.getElementById('cmpLimpar')?.addEventListener('click', async () => {
+    ['cmpCidade','cmpMacro','cmpMicro'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const codSel = document.getElementById('cmpCodGrupo');
+    if (codSel) Array.from(codSel.options).forEach(o => { o.selected = false; });
+    document.getElementById('cmpModo').value = 'consolidado';
+    document.getElementById('cmpOrdenar').value = 'desvio';
+    document.getElementById('cmpTopN').value = '25';
+    await loadComparativoFiltros();
+    await loadComparativo(false);
+});
+document.getElementById('cmpModo')?.addEventListener('change', () => loadComparativo(false));
+document.getElementById('cmpOrdenar')?.addEventListener('change', () => loadComparativo(false));
+document.getElementById('cmpCodGrupo')?.addEventListener('change', () => loadComparativo(false));
+document.getElementById('cmpTopN')?.addEventListener('change', () => {
+    if ((document.getElementById('cmpModo')?.value || '') === 'cod_grupo') loadComparativo(false);
 });
 
 // ── INIT ──────────────────────────────────────────────────────────

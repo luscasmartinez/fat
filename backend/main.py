@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import pandas as pd
+import unicodedata
 
 from database import engine, get_db, Base
 from models import Faturamento, Volume, MetaFaturamento
@@ -1196,6 +1197,234 @@ def get_metas_por_cod_grupo(
         }
         for r in rows
     ]
+
+
+def _norm_txt(v: Optional[str]) -> str:
+    s = str(v or "").strip().upper()
+    s = unicodedata.normalize("NFD", s)
+    return "".join(c for c in s if unicodedata.category(c) != "Mn")
+
+
+def _classifica_meta(agrupador: Optional[str]) -> Optional[str]:
+    a = _norm_txt(agrupador)
+    if a == "DIRETAS AGUA" or a == "DIRETAS ÁGUA":
+        return "diretas_agua"
+    if a == "SERVICO BASICO" or a == "SERVIÇO BÁSICO":
+        return "servico_basico"
+    if a == "DIRETAS ESGOTO":
+        return "diretas_esgoto"
+    if a == "INDIRETAS AGUA" or a == "INDIRETAS ÁGUA":
+        return "indiretas_agua"
+    if a == "INDIRETAS ESGOTO":
+        return "indiretas_esgoto"
+    return None
+
+
+def _classifica_fat(classe_rubrica: Optional[str], grupo_rubrica: Optional[str]) -> Optional[str]:
+    c = _norm_txt(classe_rubrica)
+    g = _norm_txt(grupo_rubrica)
+    # Comparacao 1: CLASSE_RUBRICA = Contas de Agua / Abatimentos de Agua
+    if c in {"CONTAS DE AGUA", "CONTAS D AGUA", "ABATIMENTOS DE AGUA", "ABATIMENTO DE AGUA"}:
+        return "diretas_agua"
+    # Comparacao 2: CLASSE_RUBRICA = Contas de Agua SB
+    if c in {"CONTAS DE AGUA SB", "CONTAS D AGUA SB", "CONTA DE AGUA SB", "SERVICO BASICO"}:
+        return "servico_basico"
+    # Comparacao 3: GRUPO_RUBRICA = Diretas Esgoto
+    if g == "DIRETAS ESGOTO":
+        return "diretas_esgoto"
+    # Comparacao 4: GRUPO_RUBRICA = Indiretas Agua
+    if g == "INDIRETAS AGUA" or g == "INDIRETAS ÁGUA":
+        return "indiretas_agua"
+    # Comparacao 5: GRUPO_RUBRICA = Indiretas Esgoto
+    if g == "INDIRETAS ESGOTO":
+        return "indiretas_esgoto"
+    return None
+
+
+def _label_comparativo(key: str) -> str:
+    return {
+        "diretas_agua": "Diretas Água (Contas de Água + Abatimentos de Água)",
+        "servico_basico": "Serviço Básico (Contas de Água SB)",
+        "diretas_esgoto": "Diretas Esgoto",
+        "indiretas_agua": "Indiretas Água",
+        "indiretas_esgoto": "Indiretas Esgoto",
+    }.get(key, key)
+
+
+@app.get("/api/comparativo/filtros")
+def get_comparativo_filtros(
+    db: Session = Depends(get_db),
+    cidade: Optional[str] = Query(None),
+    macro: Optional[str] = Query(None),
+    micro: Optional[str] = Query(None),
+    cod_grupos: Optional[List[int]] = Query(None),
+):
+    base = db.query(Faturamento).filter(
+        (Faturamento.is_grand_total == False) | (Faturamento.is_grand_total == None)
+    )
+    if cidade:
+        base = base.filter(Faturamento.cidade == cidade)
+    if macro:
+        base = base.filter(Faturamento.macro == macro)
+    if micro:
+        base = base.filter(Faturamento.micro == micro)
+    if cod_grupos:
+        base = base.filter(Faturamento.cod_grupo.in_(cod_grupos))
+
+    cidades = [r[0] for r in base.with_entities(Faturamento.cidade).distinct().order_by(Faturamento.cidade).all() if r[0]]
+    macros = [r[0] for r in base.with_entities(Faturamento.macro).distinct().order_by(Faturamento.macro).all() if r[0]]
+    micros = [r[0] for r in base.with_entities(Faturamento.micro).distinct().order_by(Faturamento.micro).all() if r[0]]
+    cods = sorted([r[0] for r in base.with_entities(Faturamento.cod_grupo).distinct().all() if r[0] is not None])
+    return {"cidades": cidades, "macros": macros, "micros": micros, "cod_grupos": cods}
+
+
+@app.get("/api/comparativo")
+def get_comparativo(
+    db: Session = Depends(get_db),
+    cidade: Optional[str] = Query(None),
+    macro: Optional[str] = Query(None),
+    micro: Optional[str] = Query(None),
+    cod_grupos: Optional[List[int]] = Query(None),
+    modo: str = Query("consolidado"),
+    top_n_cod_grupo: int = Query(25, ge=5, le=200),
+    ordenar_por: str = Query("desvio"),
+):
+    from sqlalchemy import func as sqlfunc
+
+    fat_base = db.query(Faturamento).filter(
+        (Faturamento.is_grand_total == False) | (Faturamento.is_grand_total == None)
+    )
+    meta_base = db.query(MetaFaturamento)
+
+    if cidade:
+        fat_base = fat_base.filter(Faturamento.cidade == cidade)
+        meta_base = meta_base.filter(MetaFaturamento.cidade == cidade)
+    if macro:
+        fat_base = fat_base.filter(Faturamento.macro == macro)
+        meta_base = meta_base.filter(MetaFaturamento.macro == macro)
+    if micro:
+        fat_base = fat_base.filter(Faturamento.micro == micro)
+        meta_base = meta_base.filter(MetaFaturamento.micro == micro)
+    if cod_grupos:
+        fat_base = fat_base.filter(Faturamento.cod_grupo.in_(cod_grupos))
+        meta_base = meta_base.filter(MetaFaturamento.cod_grupo.in_(cod_grupos))
+
+    categories = ["diretas_agua", "servico_basico", "diretas_esgoto", "indiretas_agua", "indiretas_esgoto"]
+
+    def _build_items(fat_rows, meta_rows):
+        real = {k: 0.0 for k in categories}
+        meta = {k: 0.0 for k in categories}
+        for r in fat_rows:
+            key = _classifica_fat(r.classe_rubrica, r.grupo_rubrica)
+            if key:
+                real[key] += float(r.valor or 0)
+        for r in meta_rows:
+            key = _classifica_meta(r.agrupador)
+            if key:
+                meta[key] += float(r.valor or 0)
+        items = []
+        for k in categories:
+            rv = real[k]
+            mv = meta[k]
+            pct = (rv / mv * 100) if mv > 0 else None
+            items.append({
+                "id": k,
+                "label": _label_comparativo(k),
+                "realizado": round(rv, 2),
+                "meta": round(mv, 2),
+                "desvio": round(rv - mv, 2),
+                "pct_atingimento": round(pct, 2) if pct is not None else None,
+                "atingiu": bool(pct is not None and pct >= 100),
+            })
+        return items
+
+    if modo == "cod_grupo":
+        fat_rows = (
+            fat_base.with_entities(
+                Faturamento.cod_grupo.label("cod_grupo"),
+                Faturamento.classe_rubrica.label("classe_rubrica"),
+                Faturamento.grupo_rubrica.label("grupo_rubrica"),
+                sqlfunc.sum(Faturamento.sum_valor).label("valor"),
+            )
+            .group_by(Faturamento.cod_grupo, Faturamento.classe_rubrica, Faturamento.grupo_rubrica)
+            .all()
+        )
+        meta_rows = (
+            meta_base.with_entities(
+                MetaFaturamento.cod_grupo.label("cod_grupo"),
+                MetaFaturamento.agrupador.label("agrupador"),
+                sqlfunc.sum(MetaFaturamento.valor).label("valor"),
+            )
+            .group_by(MetaFaturamento.cod_grupo, MetaFaturamento.agrupador)
+            .all()
+        )
+
+        fat_by_cod: dict = {}
+        meta_by_cod: dict = {}
+        for r in fat_rows:
+            cod = r.cod_grupo if r.cod_grupo is not None else -1
+            fat_by_cod.setdefault(cod, []).append(r)
+        for r in meta_rows:
+            cod = r.cod_grupo if r.cod_grupo is not None else -1
+            meta_by_cod.setdefault(cod, []).append(r)
+
+        all_cod = sorted(set(fat_by_cod.keys()) | set(meta_by_cod.keys()))
+        by_cod = []
+        for cod in all_cod:
+            items = _build_items(fat_by_cod.get(cod, []), meta_by_cod.get(cod, []))
+            total_real = sum(i["realizado"] for i in items)
+            total_meta = sum(i["meta"] for i in items)
+            pct = (total_real / total_meta * 100) if total_meta > 0 else None
+            by_cod.append({
+                "cod_grupo": None if cod == -1 else cod,
+                "realizado_total": round(total_real, 2),
+                "meta_total": round(total_meta, 2),
+                "desvio_total": round(total_real - total_meta, 2),
+                "pct_atingimento_total": round(pct, 2) if pct is not None else None,
+                "items": items,
+            })
+
+        if ordenar_por == "faturamento":
+            by_cod.sort(key=lambda x: x["realizado_total"], reverse=True)
+        elif ordenar_por == "pct":
+            by_cod.sort(key=lambda x: (x["pct_atingimento_total"] if x["pct_atingimento_total"] is not None else -1), reverse=True)
+        else:
+            by_cod.sort(key=lambda x: abs(x["desvio_total"]), reverse=True)
+        by_cod = by_cod[:top_n_cod_grupo]
+
+        return {"modo": "cod_grupo", "ordenar_por": ordenar_por, "rows": by_cod}
+
+    fat_rows = (
+        fat_base.with_entities(
+            Faturamento.classe_rubrica.label("classe_rubrica"),
+            Faturamento.grupo_rubrica.label("grupo_rubrica"),
+            sqlfunc.sum(Faturamento.sum_valor).label("valor"),
+        )
+        .group_by(Faturamento.classe_rubrica, Faturamento.grupo_rubrica)
+        .all()
+    )
+    meta_rows = (
+        meta_base.with_entities(
+            MetaFaturamento.agrupador.label("agrupador"),
+            sqlfunc.sum(MetaFaturamento.valor).label("valor"),
+        )
+        .group_by(MetaFaturamento.agrupador)
+        .all()
+    )
+    items = _build_items(fat_rows, meta_rows)
+    total_real = sum(i["realizado"] for i in items)
+    total_meta = sum(i["meta"] for i in items)
+    pct_total = (total_real / total_meta * 100) if total_meta > 0 else None
+    return {
+        "modo": "consolidado",
+        "kpis": {
+            "realizado_total": round(total_real, 2),
+            "meta_total": round(total_meta, 2),
+            "desvio_total": round(total_real - total_meta, 2),
+            "pct_atingimento_total": round(pct_total, 2) if pct_total is not None else None,
+        },
+        "items": items,
+    }
 
 
 # ── /api/db ────────────────────────────────────────────────────────────────────
